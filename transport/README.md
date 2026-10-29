@@ -1,4 +1,4 @@
-# :transport — the bridge seam (SMS-1, SMS-2, SMS-3, SMS-4, SMS-5, SMS-6, SMS-7)
+# :transport — the bridge seam (SMS-1, SMS-2, SMS-3, SMS-4, SMS-5, SMS-6, SMS-7, SMS-8)
 
 Pure Kotlin/JVM module holding the InkStax SMS layer's one
 bridge seam. SMS-1 extracted the outbound side; SMS-2 adds the
@@ -53,6 +53,18 @@ inbound side with its local binding first.
   exchange runs here — a binding performs the exchange, persists
   what these definitions accept (the app-side storage lands in
   SMS-7), and discards the credential on disconnect.
+- `PairingExchangeWire.kt` — the pairing exchange wire
+  definitions (SMS-8): the one request shape every binding POSTs
+  (only the token, as JSON, to `/companion/exchange` on the
+  scanned offer's endpoint, escaped exactly) and the one reading
+  of the answer (a flat JSON object of string values on a success
+  status, judged by `exchangedCredentialFor`; Gone names the
+  token expired, Conflict names it already used, other client
+  errors are the endpoint refusing, no answer is unreachable, and
+  any other answer is malformed). Pure definitions only: no
+  network call runs here — a binding performs the POST, supplies
+  the status and body, stores a success through SMS-7's storage,
+  and maps a failure through SMS-6's attempt rule.
 - `InboundSink` + `InboundSms` + `inboundDispositionFor` — the
   inbound side of the seam (SMS-2). The disposition rule is
   shared by every binding: SMS text is handled, MMS is
@@ -66,15 +78,18 @@ inbound side with its local binding first.
 - **GMS-free, Android-free.** This module depends on the Kotlin
   standard library only (JUnit for its tests). The local-mode
   build's GMS-free invariant is structural here.
-- **No bridge protocol yet.** No wire format, no network
-  transport, no endpoint or credential material. SMS-4 defines
+- **No network transport yet.** SMS-8 defines the pairing
+  exchange's wire format, but no binding performs it, and no
+  endpoint or credential material lives here. SMS-4 defines
   the ack/heartbeat *states* every binding shares, but no binding
   sends a heartbeat or an ack yet. SMS-5 defines the pairing
   payload and token *states*, but no scanner reads a QR and no
   exchange runs yet. SMS-6 defines the exchange *outcome* and
   credential *states* the same way, but no exchange runs yet;
   SMS-7 adds the app-side credential storage that persists what
-  the definitions accept. The local binding is
+  the definitions accept, and SMS-8 defines the exchange's wire
+  shape and answer reading, but no binding performs the POST
+  yet. The local binding is
   in-process; host/cloud bindings stay design-intent until their
   own slices open.
 - **No second intake, store, or scheduler.** Receivers persist
@@ -140,6 +155,19 @@ and clears token and fields on disconnect. SMS-7 stores and
 reads a credential; it does not run the network exchange and no
 scanner reads a QR yet — those act on this storage in a later
 slice.
+
+## Upstream touchpoint registry (SMS-8, ≤5, tagged in code)
+
+None — zero upstream files are modified in this slice. The whole
+slice is new files inside `:transport` (`PairingExchangeWire.kt`
+and its test) plus this README: it defines the exchange request
+shape and the strict reading of its answer (status first, then a
+flat JSON object of string values judged by SMS-6's
+`exchangedCredentialFor`), so a malformed or mismatched answer
+can never leave the phone half-paired. SMS-8 runs no network
+call and reads no QR yet — a binding performing the POST and
+feeding SMS-7's storage, and the scanner UI, act on these
+definitions in later slices.
 
 SMS-3 note: the dedicated posture keeps the upstream startup flow
 unchanged (default role requested, declining it exits). The
