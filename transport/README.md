@@ -762,3 +762,12 @@ heartbeat path that finds no usable credential cancels it as
 it cancels the heartbeat schedule. A drain of an empty queue
 is a defined no-op, so a paired phone with nothing held pays
 one empty read per queue per interval.
+
+Both drain workers run their drain under a per-queue execution
+guard (DrainExecutionGuard.kt, added with this slice): periodic
+work has its own unique names, outside the appended one-time
+chains, so without it a retry and a caller-triggered drain of
+the same queue could run at once and send the same head twice.
+The guard is held across the whole drain, network calls
+included; the storage guards remain held only around storage
+updates, inside it.

@@ -25,7 +25,13 @@ private const val PENDING_REPORT_DRAIN_RETRY_WORK_NAME = "pending_outbound_repor
  * guards and the same release rules, attempted again. The two
  * queues are scheduled together because they block for the same
  * reasons and recover together; scheduling only one would leave
- * the other waiting for an unrelated event.
+ * the other waiting for an unrelated event. Periodic work runs
+ * under its own unique names, outside the one-time chains the
+ * callers append to, so the workers themselves serialize every
+ * trigger of a queue under that queue's execution guard (see
+ * DrainExecutionGuard) — a retry due while a caller-triggered
+ * drain is still running waits for it instead of delivering or
+ * reporting the same head a second time.
  *
  * Periodic work is kept, not replaced, when this is called
  * again: pairing, a boot, and every Settings visit all ensure

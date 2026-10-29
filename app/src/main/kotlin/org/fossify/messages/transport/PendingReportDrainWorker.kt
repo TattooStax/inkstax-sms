@@ -27,7 +27,13 @@ class PendingReportDrainWorker(
 ) : Worker(context, params) {
 
     override fun doWork(): Result {
-        applicationContext.drainPendingOutboundReportQueue()
+        // Every trigger of this drain runs under the queue's
+        // execution guard, so a scheduled retry and a
+        // verdict-triggered drain never report the same head
+        // at once (see DrainExecutionGuard).
+        synchronized(DrainExecutionGuard.pendingReportLock) {
+            applicationContext.drainPendingOutboundReportQueue()
+        }
         return Result.success()
     }
 }

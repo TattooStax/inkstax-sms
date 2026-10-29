@@ -28,7 +28,13 @@ class HeldDrainWorker(
 ) : Worker(context, params) {
 
     override fun doWork(): Result {
-        applicationContext.drainHeldInboundQueue(System.currentTimeMillis())
+        // Every trigger of this drain runs under the queue's
+        // execution guard, so a scheduled retry and an
+        // arrival-triggered drain never deliver the same head
+        // at once (see DrainExecutionGuard).
+        synchronized(DrainExecutionGuard.heldInboundLock) {
+            applicationContext.drainHeldInboundQueue(System.currentTimeMillis())
+        }
         return Result.success()
     }
 }
