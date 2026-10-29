@@ -1,4 +1,4 @@
-# :transport — the bridge seam (SMS-1, SMS-2, SMS-3, SMS-4, SMS-5, SMS-6, SMS-7, SMS-8, SMS-9, SMS-10, SMS-11), SMS-12
+# :transport — the bridge seam (SMS-1, SMS-2, SMS-3, SMS-4, SMS-5, SMS-6, SMS-7, SMS-8, SMS-9, SMS-10, SMS-11), SMS-12, SMS-14
 
 Pure Kotlin/JVM module holding the InkStax SMS layer's one
 bridge seam. SMS-1 extracted the outbound side; SMS-2 adds the
@@ -71,6 +71,19 @@ inbound side with its local binding first.
   network call runs here — a binding performs the POST, supplies
   the status and body, stores a success through SMS-7's storage,
   and maps a failure through SMS-6's attempt rule.
+- `HeartbeatWire.kt` — the heartbeat wire definitions (SMS-14):
+  the one request shape every binding beats with (the device id
+  and the phone's send time as a flat JSON string object, POSTed
+  to `/companion/heartbeat` on the stored credential's endpoint,
+  the secret carried only in the authorization value, never in
+  the body) and the one reading of the answer (only No Content
+  is a recorded beat — the ack carries no body and no message
+  state, so a healthy link can never be mistaken for a delivered
+  message; a credential refusal is its own failure, distinct
+  from an unreachable endpoint). A credential the seam does not
+  accept for its own endpoint builds no request at all. Pure
+  definitions only: no binding performs the POST yet, and no
+  timer or scheduler lives here.
 - `InboundSink` + `InboundSms` + `inboundDispositionFor` — the
   inbound side of the seam (SMS-2). The disposition rule is
   shared by every binding: SMS text is handled, MMS is
@@ -89,8 +102,8 @@ inbound side with its local binding first.
   the POST SMS-8 defines and feeds SMS-7's storage; this module
   still holds definitions only, and no endpoint or credential
   material lives here. SMS-4 defines the ack/heartbeat *states*
-  every binding shares, but no binding sends a heartbeat or an
-  ack yet. SMS-5 defines the pairing payload and token *states*,
+  every binding shares, and SMS-14 defines the heartbeat's wire
+  shape, but no binding sends a heartbeat or an ack yet. SMS-5 defines the pairing payload and token *states*,
   and the scanner that reads a QR lives app-side (SMS-10).
   The local binding is
   in-process; host/cloud bindings stay design-intent until their
@@ -278,6 +291,19 @@ it to that contract directly, with no URI parse in front of
 it — those decoder-level tests fail against the broad digit
 test they replace, which decoded the Arabic-Indic spelling of
 an escape into a control byte instead of rejecting it.
+
+## Upstream touchpoint registry (SMS-14, ≤5, tagged in code)
+
+None — zero upstream files are modified in this slice. The
+whole slice is new files inside `:transport`
+(`HeartbeatWire.kt` and its test) plus this README: it defines
+the heartbeat request shape and the reading of its answer
+(status only — the ack carries no body), so a binding that
+performs the beat in a later slice sends the one shape and
+judges the answer the one way. SMS-14 runs no network call,
+starts no timer, and sends no ack — the binding, its schedule,
+and the foreground notification act on these definitions in
+later slices.
 
 SMS-3 note: the dedicated posture keeps the upstream startup flow
 unchanged (default role requested, declining it exits). The
