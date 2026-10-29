@@ -3,20 +3,19 @@ package org.fossify.messages.messaging
 import android.content.Context
 import android.telephony.SmsMessage
 import android.util.Patterns
-import android.widget.Toast.LENGTH_LONG
 import com.klinker.android.send_message.Settings
-import org.fossify.commons.extensions.showErrorToast
-import org.fossify.commons.extensions.toast
+import inkstax.sms.transport.OutboundChannel
+import inkstax.sms.transport.OutboundSms
+import inkstax.sms.transport.TransportOutcome
+import inkstax.sms.transport.outboundChannel
 import org.fossify.commons.helpers.ensureBackgroundThread
-import org.fossify.messages.R
 import org.fossify.messages.extensions.config
 import org.fossify.messages.extensions.getThreadId
 import org.fossify.messages.extensions.messagingUtils
 import org.fossify.messages.extensions.shortcutHelper
-import org.fossify.messages.messaging.SmsException.Companion.EMPTY_DESTINATION_ADDRESS
-import org.fossify.messages.messaging.SmsException.Companion.ERROR_PERSISTING_MESSAGE
-import org.fossify.messages.messaging.SmsException.Companion.ERROR_SENDING_MESSAGE
 import org.fossify.messages.models.Attachment
+import org.fossify.messages.transport.messageTransport
+import org.fossify.messages.transport.showSmsTransportFailure
 
 @Deprecated("TODO: Move/rewrite messaging config code into the app.")
 fun Context.getSendMessageSettings(): Settings {
@@ -49,9 +48,15 @@ fun Context.sendMessageCompat(
     }
 
     val messagingUtils = messagingUtils
-    val isMms = attachments.isNotEmpty() || isLongMmsMessage(text, settings)
-            || addresses.size > 1 && settings.group
-    if (isMms) {
+    // SMS-1-TOUCHPOINT 1/5: routing decision and SMS send go through the :transport seam
+    // (inkstax.sms.transport); the long-message check keeps its previous short-circuit.
+    val channel = outboundChannel(
+        hasAttachments = attachments.isNotEmpty(),
+        isLongMms = attachments.isEmpty() && isLongMmsMessage(text, settings),
+        addressCount = addresses.size,
+        sendGroupAsMms = settings.group
+    )
+    if (channel == OutboundChannel.MMS) {
         // we send all MMS attachments separately to reduces the chances of hitting provider MMS limit.
         if (attachments.isNotEmpty()) {
             val lastIndex = attachments.lastIndex
@@ -68,37 +73,17 @@ fun Context.sendMessageCompat(
             messagingUtils.sendMmsMessage(text, addresses, null, settings, messageId)
         }
     } else {
-        try {
-            messagingUtils.sendSmsMessage(
+        val outcome = messageTransport.sendSms(
+            OutboundSms(
                 text = text,
-                addresses = addresses.toSet(),
-                subId = settings.subscriptionId,
+                addresses = addresses,
+                subscriptionId = settings.subscriptionId,
                 requireDeliveryReport = settings.deliveryReports,
                 messageId = messageId
             )
-        } catch (e: SmsException) {
-            when (e.errorCode) {
-                EMPTY_DESTINATION_ADDRESS -> toast(
-                    id = R.string.empty_destination_address,
-                    length = LENGTH_LONG
-                )
-
-                ERROR_PERSISTING_MESSAGE -> toast(
-                    id = R.string.unable_to_save_message,
-                    length = LENGTH_LONG
-                )
-
-                ERROR_SENDING_MESSAGE -> toast(
-                    msg = getString(
-                        R.string.sms_preparation_error_details,
-                        getString(R.string.message_not_sent_short),
-                        e.errorCode
-                    ),
-                    length = LENGTH_LONG
-                )
-            }
-        } catch (e: Exception) {
-            showErrorToast(e)
+        )
+        if (outcome is TransportOutcome.Failed) {
+            showSmsTransportFailure(outcome)
         }
     }
     ensureBackgroundThread {
