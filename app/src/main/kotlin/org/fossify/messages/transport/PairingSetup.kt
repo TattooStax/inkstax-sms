@@ -7,6 +7,7 @@ import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import inkstax.sms.transport.PairingExchangeFailure
 import inkstax.sms.transport.pairingOfferFromQrPayload
+import java.util.concurrent.atomic.AtomicBoolean
 import org.fossify.commons.extensions.toast
 import org.fossify.commons.helpers.ensureBackgroundThread
 import org.fossify.messages.R
@@ -31,7 +32,21 @@ import org.fossify.messages.R
  * started, the same rule every activity-result launcher follows;
  * the host registers the launcher once as a field and launches it
  * from its pairing entry point.
+ *
+ * Two seam rules bind this caller. PAIRED is terminal (see
+ * Pairing.kt in :transport): a phone that already holds a stored
+ * credential pairs nothing new — re-pairing is a disconnect
+ * first, never a second scan silently replacing a working
+ * pairing or burning another single-use token. And one attempt
+ * runs at a time: the guard below is process-wide so it survives
+ * the hosting activity being recreated mid-exchange, and it
+ * covers the paired check, the exchange, and the storage retry
+ * together, so two attempts can never interleave their writes
+ * into a credential that matches neither.
  */
+private object PairingAttemptGuard {
+    val inFlight = AtomicBoolean(false)
+}
 fun ComponentActivity.registerPairingScanner(): ActivityResultLauncher<ScanOptions> {
     return registerForActivityResult(ScanContract()) { result ->
         val contents = result.contents ?: return@registerForActivityResult
@@ -58,29 +73,43 @@ fun Activity.launchPairingScan(launcher: ActivityResultLauncher<ScanOptions>) {
  * vocabulary the :transport definitions own.
  */
 private fun Activity.handleScannedPairingPayload(contents: String) {
+    if (!PairingAttemptGuard.inFlight.compareAndSet(false, true)) {
+        toast(R.string.pairing_in_progress)
+        return
+    }
     val offer = pairingOfferFromQrPayload(contents)
     if (offer == null) {
+        PairingAttemptGuard.inFlight.set(false)
         toast(R.string.pairing_qr_not_recognized)
+        return
+    }
+    if (storedDeviceCredential() != null) {
+        PairingAttemptGuard.inFlight.set(false)
+        toast(R.string.pairing_already_paired)
         return
     }
     toast(R.string.pairing_in_progress)
     ensureBackgroundThread {
-        val messageId = when (val result = performPairingExchange(offer)) {
-            is PairingExchangeBindingResult.Stored -> R.string.pairing_succeeded
-            is PairingExchangeBindingResult.StorageFailed -> {
-                // The exchange burned the single-use token to mint
-                // this credential, so the one recovery that does
-                // not need a fresh scan is storing the credential
-                // the result carries, once more, right here.
-                if (storeDeviceCredential(result.credential)) {
-                    R.string.pairing_succeeded
-                } else {
-                    R.string.pairing_storage_failed
+        try {
+            val messageId = when (val result = performPairingExchange(offer)) {
+                is PairingExchangeBindingResult.Stored -> R.string.pairing_succeeded
+                is PairingExchangeBindingResult.StorageFailed -> {
+                    // The exchange burned the single-use token to mint
+                    // this credential, so the one recovery that does
+                    // not need a fresh scan is storing the credential
+                    // the result carries, once more, right here.
+                    if (storeDeviceCredential(result.credential)) {
+                        R.string.pairing_succeeded
+                    } else {
+                        R.string.pairing_storage_failed
+                    }
                 }
+                is PairingExchangeBindingResult.Failed -> pairingFailureMessage(result.failure)
             }
-            is PairingExchangeBindingResult.Failed -> pairingFailureMessage(result.failure)
+            runOnUiThread { toast(messageId) }
+        } finally {
+            PairingAttemptGuard.inFlight.set(false)
         }
-        runOnUiThread { toast(messageId) }
     }
 }
 

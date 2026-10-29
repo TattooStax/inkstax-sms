@@ -110,6 +110,10 @@ scanner (Apache-2.0, no GMS) launched from Settings reads a QR,
 only a payload `pairingOfferFromQrPayload` accepts starts an
 exchange, and a minted-but-unstored credential is retried
 through the storage once from the credential the result carries.
+A phone that already holds a credential pairs nothing new
+(PAIRED is terminal; re-pairing is a disconnect first), and a
+process-wide single-flight guard covers the paired check, the
+exchange, and the storage retry together.
 
 ## Upstream touchpoint registry (SMS-1, ≤5, tagged in code)
 
@@ -210,6 +214,9 @@ scanner is the exchange binding's first caller: a scanned
 payload starts an exchange only when it reads as a pairing
 offer, a cancelled scan does nothing, and every exchange
 outcome is reported in the definitions' failure vocabulary.
+An already-paired phone refuses a new offer before any
+exchange runs, and one attempt runs at a time under a
+process-wide guard.
 The library's own manifest supplies the camera permission and
 its capture activity, so this slice adds no manifest entry.
 Still not claimed: the download/App-Link serving of the QR is

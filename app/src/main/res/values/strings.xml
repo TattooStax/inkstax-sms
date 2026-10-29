@@ -13,6 +13,7 @@
     <string name="pairing_scan_prompt">Point the camera at the pairing code</string>
     <string name="pairing_qr_not_recognized">That code is not a pairing code</string>
     <string name="pairing_in_progress">Pairing…</string>
+    <string name="pairing_already_paired">This phone is already paired</string>
     <string name="pairing_succeeded">This phone is paired</string>
     <string name="pairing_storage_failed">Pairing worked, but saving it on this phone failed. Scan a fresh code to try again.</string>
     <string name="pairing_token_lapsed">That pairing code has expired or already been used. Get a fresh code and scan again.</string>
