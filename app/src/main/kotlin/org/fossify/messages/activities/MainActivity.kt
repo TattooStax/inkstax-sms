@@ -2,7 +2,6 @@ package org.fossify.messages.activities
 
 import android.Manifest
 import android.annotation.SuppressLint
-import android.app.role.RoleManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ShortcutInfo
@@ -10,7 +9,6 @@ import android.content.pm.ShortcutManager
 import android.graphics.drawable.Icon
 import android.graphics.drawable.LayerDrawable
 import android.os.Bundle
-import android.provider.Telephony
 import android.text.TextUtils
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.app.ActivityCompat
@@ -36,7 +34,6 @@ import org.fossify.commons.extensions.getProperPrimaryColor
 import org.fossify.commons.extensions.getProperTextColor
 import org.fossify.commons.extensions.hideKeyboard
 import org.fossify.commons.extensions.openNotificationSettings
-import org.fossify.commons.extensions.toast
 import org.fossify.commons.extensions.underlineText
 import org.fossify.commons.extensions.updateTextColors
 import org.fossify.commons.extensions.viewBinding
@@ -50,7 +47,6 @@ import org.fossify.commons.helpers.PERMISSION_READ_SMS
 import org.fossify.commons.helpers.PERMISSION_SEND_SMS
 import org.fossify.commons.helpers.SHORT_ANIMATION_DURATION
 import org.fossify.commons.helpers.ensureBackgroundThread
-import org.fossify.commons.helpers.isQPlus
 import org.fossify.commons.models.FAQItem
 import org.fossify.commons.models.Release
 import org.fossify.messages.BuildConfig
@@ -75,6 +71,8 @@ import org.fossify.messages.models.Events
 import org.fossify.messages.models.Message
 import org.fossify.messages.models.SearchResult
 import org.fossify.messages.transport.ensureRolePosture
+import org.fossify.messages.transport.isDefaultSmsApp
+import org.fossify.messages.transport.launchDefaultSmsRoleSetup
 import org.fossify.messages.transport.storedRolePosture
 import org.greenrobot.eventbus.EventBus
 import org.greenrobot.eventbus.Subscribe
@@ -222,7 +220,11 @@ class MainActivity : SimpleActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, resultData: Intent?) {
         super.onActivityResult(requestCode, resultCode, resultData)
         if (requestCode == MAKE_DEFAULT_APP_REQUEST) {
-            if (resultCode == RESULT_OK) {
+            // SMS-33-TOUCHPOINT 1/1: the screens setup opens do not
+            // all report a grant the same way (the default-apps
+            // screen returns no grant result), so the return is
+            // judged by reading the held state back.
+            if (isDefaultSmsApp()) {
                 askPermissions()
             } else {
                 finish()
@@ -267,27 +269,12 @@ class MainActivity : SimpleActivity() {
             return
         }
 
-        if (isQPlus()) {
-            val roleManager = getSystemService(RoleManager::class.java)
-            if (roleManager!!.isRoleAvailable(RoleManager.ROLE_SMS)) {
-                if (roleManager.isRoleHeld(RoleManager.ROLE_SMS)) {
-                    askPermissions()
-                } else {
-                    val intent = roleManager.createRequestRoleIntent(RoleManager.ROLE_SMS)
-                    startActivityForResult(intent, MAKE_DEFAULT_APP_REQUEST)
-                }
-            } else {
-                toast(org.fossify.commons.R.string.unknown_error_occurred)
-                finish()
-            }
-        } else {
-            if (Telephony.Sms.getDefaultSmsPackage(this) == packageName) {
-                askPermissions()
-            } else {
-                val intent = Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT)
-                intent.putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME, packageName)
-                startActivityForResult(intent, MAKE_DEFAULT_APP_REQUEST)
-            }
+        // SMS-33-TOUCHPOINT 1/1 (continued): a dedicated phone is
+        // taken straight to the one system screen its setup needs
+        // by the one-tap caller; a phone that already holds the
+        // role proceeds without a screen.
+        launchDefaultSmsRoleSetup(MAKE_DEFAULT_APP_REQUEST) {
+            askPermissions()
         }
     }
 
