@@ -685,7 +685,13 @@ outcome, because the report stays pending for a re-report
 against the same source id. Each report carries the time the
 phone reached its verdict, as stored — the drain takes no
 report time of its own, so a re-report never rewrites when a
-verdict was reached. Every read-modify-write of the stored
+verdict was reached. Each report is performed with the
+credential the queue was read under — the outbound ack
+binding takes a caller-held credential for this — and the
+release re-checks that pairing inside the guard before
+folding, so a disconnect and re-pair landing mid-drain never
+reroutes a verdict to the new pairing's endpoint and never
+folds a release into the new pairing's queue. Every read-modify-write of the stored
 queue runs under one process-wide guard, with a drain's
 network call outside it, so a hold landing while a report is
 in flight is neither lost under that report's release nor

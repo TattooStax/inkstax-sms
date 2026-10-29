@@ -39,6 +39,17 @@ import inkstax.sms.transport.pendingReportQueueAfterReport
  * verdict when it was reached, never when the drain happened
  * to run.
  *
+ * Each attempt reports with the credential the queue was read
+ * under, captured before the report: a disconnect and re-pair
+ * landing while a report is in flight never reroutes a verdict
+ * taken in under the old pairing to the new pairing's
+ * endpoint. The release re-checks that pairing inside the
+ * guard before it folds anything — a pairing that changed
+ * mid-report leaves the stored queue, which is the new
+ * pairing's, untouched; the recording already landed at the
+ * pairing that was owed it, and the loop moves on to whatever
+ * the current pairing holds.
+ *
  * This call blocks on the network, once per pending report, so
  * it belongs on a background thread. It wires no trigger of
  * its own — the caller that holds a verdict on a send result,
@@ -49,10 +60,19 @@ fun Context.drainPendingOutboundReportQueue(): PendingReportQueueDrainResult {
     var reportedCount = 0
     var sawPending = false
     while (true) {
-        val queue = storedPendingOutboundReportQueue()
-        val head = nextPendingOutboundReport(queue) ?: break
+        val credential = storedDeviceCredential()
+        val queue = if (credential == null) {
+            emptyList()
+        } else {
+            storedPendingOutboundReportQueue()
+        }
+        val head = nextPendingOutboundReport(queue)
+        if (credential == null || head == null) {
+            break
+        }
         sawPending = true
         val result = performOutboundAckReport(
+            credential = credential,
             sourceId = head.sourceId,
             event = head.event,
             errorCode = head.errorCode,
@@ -63,33 +83,48 @@ fun Context.drainPendingOutboundReportQueue(): PendingReportQueueDrainResult {
             return PendingReportQueueDrainResult.Blocked(
                 stoppedBy = result,
                 reportedCount = reportedCount,
-                remainingCount = queue.size
+                // Read back under the guard at the stop, not
+                // the size this attempt read before its network
+                // call: a verdict held while the report was in
+                // flight is still pending and counts here.
+                remainingCount = synchronized(PendingReportQueueGuard.lock) {
+                    storedPendingOutboundReportQueue().size
+                }
             )
         }
         // The release folds onto the queue as stored now — not
         // the copy this attempt read before its network call —
         // under the guard a verdict's hold also takes, so the
         // read, fold, and store cannot interleave with a hold
-        // landing while the report was in flight.
+        // landing while the report was in flight. The pairing
+        // is re-checked first, inside the same block: if it
+        // changed while the report was in flight, the stored
+        // queue belongs to the new pairing and this release
+        // stores nothing — the outcome is null, distinct from
+        // a store that was attempted and failed.
         val releaseStored = synchronized(PendingReportQueueGuard.lock) {
-            val current = storedPendingOutboundReportQueue()
-            val remaining = pendingReportQueueAfterReport(current, head.sourceId, outcome)
-            if (storePendingOutboundReportQueue(remaining)) {
-                true
+            if (storedDeviceCredential() != credential) {
+                null
             } else {
-                // A failed commit can still leave the in-memory
-                // preferences holding the released queue, so the
-                // pre-release queue is written back before the
-                // failure is reported: whatever that write's own
-                // durability, the in-memory state a later drain
-                // in this process reads is the queue with the
-                // head still pending, and the stored read-back
-                // below is what the report counts.
-                storePendingOutboundReportQueue(current)
-                false
+                val current = storedPendingOutboundReportQueue()
+                val remaining = pendingReportQueueAfterReport(current, head.sourceId, outcome)
+                if (storePendingOutboundReportQueue(remaining)) {
+                    true
+                } else {
+                    // A failed commit can still leave the in-memory
+                    // preferences holding the released queue, so the
+                    // pre-release queue is written back before the
+                    // failure is reported: whatever that write's own
+                    // durability, the in-memory state a later drain
+                    // in this process reads is the queue with the
+                    // head still pending, and the stored read-back
+                    // below is what the report counts.
+                    storePendingOutboundReportQueue(current)
+                    false
+                }
             }
         }
-        if (!releaseStored) {
+        if (releaseStored == false) {
             return PendingReportQueueDrainResult.StorageFailed(
                 reportedCount = reportedCount,
                 remainingCount = storedPendingOutboundReportQueue().size

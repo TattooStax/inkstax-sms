@@ -1,6 +1,7 @@
 package org.fossify.messages.transport
 
 import android.content.Context
+import inkstax.sms.transport.DeviceCredential
 import inkstax.sms.transport.OutboundAckEvent
 import inkstax.sms.transport.OutboundAckOutcome
 import inkstax.sms.transport.outboundAckOutcomeFor
@@ -83,7 +84,6 @@ sealed interface OutboundAckBindingResult {
  * answer's body is never read — the recording answer is defined
  * to carry no body, so the status alone decides.
  */
-@Suppress("SwallowedException")
 fun Context.performOutboundAckReport(
     sourceId: String,
     event: OutboundAckEvent,
@@ -93,6 +93,27 @@ fun Context.performOutboundAckReport(
     require(reportedAtMillis >= 0L) { "reportedAtMillis must not be negative" }
     val credential = storedDeviceCredential()
         ?: return OutboundAckBindingResult.NoUsableCredential
+    return performOutboundAckReport(credential, sourceId, event, errorCode, reportedAtMillis)
+}
+
+/**
+ * The same report performed with a credential the caller
+ * already holds: a caller that read work under a pairing —
+ * the pending report drain reading its queue under the stored
+ * credential — reports with that pairing's credential, never
+ * one a disconnect and re-pair may have stored since, so a
+ * verdict taken in under one pairing is only ever sent to
+ * that pairing's endpoint.
+ */
+@Suppress("SwallowedException")
+internal fun Context.performOutboundAckReport(
+    credential: DeviceCredential,
+    sourceId: String,
+    event: OutboundAckEvent,
+    errorCode: Int?,
+    reportedAtMillis: Long
+): OutboundAckBindingResult {
+    require(reportedAtMillis >= 0L) { "reportedAtMillis must not be negative" }
     val sourceIdNamesAReply = !sourceId.isBlank() && sourceId.none { it.isWhitespace() }
     val verdictContradictsItself = when (event) {
         OutboundAckEvent.PHONE_ACKED_SENT -> errorCode != null
