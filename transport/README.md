@@ -349,11 +349,14 @@ is a later slice, not claimed here.
 
 ## Upstream touchpoint registry (SMS-16, ≤5, tagged in code)
 
-Two upstream files are modified in this slice:
+Three upstream files are modified in this slice:
 (1) `AndroidManifest.xml` — the FOREGROUND_SERVICE and
 FOREGROUND_SERVICE_DATA_SYNC permissions and the heartbeat
-service entry; (2) `strings.xml` — the heartbeat channel name
-and the persistent notification's state texts. Everything else
+service entry; (2) `strings.xml` \u2014 the heartbeat channel name
+and the persistent notification's state texts; (3)
+`SettingsActivity.kt` \u2014 one call on each visit re-arms a paired
+phone's heartbeat schedule, the recovery for a start the
+platform refused while the app was backgrounded during pairing. Everything else
 is new files: `HeartbeatSchedule.kt` and its test in
 `:transport` (the schedule rhythm — first beat immediate, later
 beats one full interval — and the notification-state vocabulary

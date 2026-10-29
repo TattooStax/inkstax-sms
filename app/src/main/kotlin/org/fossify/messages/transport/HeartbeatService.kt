@@ -240,6 +240,31 @@ fun Context.startHeartbeatService() {
     }
 }
 
+/**
+ * Re-arms the heartbeat schedule for a paired phone when the app
+ * comes to the foreground, and beats at once. This is the
+ * recovery for a start the platform refused while the app was in
+ * the background during pairing: the pairing was preserved, and
+ * the next foreground visit restores the schedule instead of the
+ * stored credential stranding the phone with no way to re-pair
+ * and nothing beating. An unpaired phone has nothing to ensure.
+ * The notification is left as it stands — the immediate beat's
+ * result updates it within seconds.
+ */
+@Suppress("SwallowedException")
+fun Context.ensureHeartbeatSchedule() {
+    if (storedDeviceCredential() == null) {
+        return
+    }
+    scheduleNextHeartbeat(nextHeartbeatDelayMillis(isFirstBeat = false))
+    try {
+        ContextCompat.startForegroundService(this, Intent(this, HeartbeatService::class.java))
+    } catch (e: IllegalStateException) {
+        // Still background-restricted; the alarm above is set, and
+        // the next foreground visit tries the immediate beat again.
+    }
+}
+
 /** Stops the heartbeat schedule and its notification, as disconnect requires. */
 fun Context.stopHeartbeatService() {
     cancelHeartbeatSchedule()
