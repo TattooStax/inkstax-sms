@@ -1,4 +1,4 @@
-# :transport — the bridge seam (SMS-1, SMS-2)
+# :transport — the bridge seam (SMS-1, SMS-2, SMS-3)
 
 Pure Kotlin/JVM module holding the InkStax SMS layer's one
 bridge seam. SMS-1 extracted the outbound side; SMS-2 adds the
@@ -13,6 +13,13 @@ inbound side with its local binding first.
 - `outboundChannel` — the SMS-vs-MMS routing decision, extracted
   unchanged from the app's send entry point so local mode uses
   the same decision the seam exposes.
+- `RolePosture` + `rolePostureForDedicatedBusinessPhone` +
+  `rolePostureFromStoredName` — the role posture bound at setup by
+  device class (SMS-3): the one question "Is this phone dedicated
+  to the business line?" maps to DEFAULT_ROLE (dedicated) or
+  PERMISSIONS_ONLY (personal). UNSET is the fail-safe: no default
+  role may be requested until the question is answered, and an
+  unrecognised stored value reads back as UNSET.
 - `InboundSink` + `InboundSms` + `inboundDispositionFor` — the
   inbound side of the seam (SMS-2). The disposition rule is
   shared by every binding: SMS text is handled, MMS is
@@ -66,3 +73,19 @@ rule after local persistence).
 Everything else in these slices is new files (this module and
 the app-side `org.fossify.messages.transport` package) — no
 other upstream file is modified.
+
+## Upstream touchpoint registry (SMS-3, ≤5, tagged in code)
+
+| # | File | Change |
+|---|------|--------|
+| 1 | `app/src/main/kotlin/org/fossify/messages/helpers/Config.kt` | Stores the posture answer as the posture name string (`rolePostureName`) |
+| 2 | `app/src/main/kotlin/org/fossify/messages/activities/MainActivity.kt` | Startup runs the one posture question (via `ensureRolePosture` in the app-side transport package) before the message flow; `loadMessages` requests the default SMS role only when the posture allows it and otherwise goes straight to runtime permissions |
+| 3 | `app/src/main/res/values/strings.xml` | The posture question string and its two answer strings |
+
+SMS-3 note: the dedicated posture keeps the upstream startup flow
+unchanged (default role requested, declining it exits). The
+personal posture is new behaviour: the default-role request is
+skipped entirely so the owner's own messenger stays default.
+Subscription pinning for the personal posture is policy in
+`:transport` (`requiresPinnedSubscription`); its enforcement at
+send selection is a later slice, not claimed here.

@@ -4,6 +4,10 @@
     <string name="type_a_message">Type a message…</string>
     <string name="message_not_sent_short">Message not sent</string>
     <string name="mms_not_forwarded">MMS received — not forwarded (SMS text only)</string>
+    <!-- SMS-3-TOUCHPOINT 3/3: the one posture setup question and its two answers -->
+    <string name="posture_question">Is this phone dedicated to the business line?</string>
+    <string name="posture_dedicated">Yes — dedicated business phone</string>
+    <string name="posture_personal">No — my personal phone</string>
     <string name="message_not_sent_touch_retry">Not sent. Touch to retry.</string>
     <string name="message_sending_error">Your message to \'%s\' has not been sent</string>
     <string name="add_person">Add Person</string>

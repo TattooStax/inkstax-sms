@@ -11,6 +11,7 @@ import android.os.Bundle
 import android.provider.Telephony
 import android.text.TextUtils
 import androidx.appcompat.content.res.AppCompatResources
+import inkstax.sms.transport.rolePostureFromStoredName
 import org.fossify.commons.dialogs.PermissionRequiredDialog
 import org.fossify.commons.extensions.adjustAlpha
 import org.fossify.commons.extensions.appLaunched
@@ -70,6 +71,7 @@ import org.fossify.messages.models.Conversation
 import org.fossify.messages.models.Events
 import org.fossify.messages.models.Message
 import org.fossify.messages.models.SearchResult
+import org.fossify.messages.transport.ensureRolePosture
 import org.greenrobot.eventbus.EventBus
 import org.greenrobot.eventbus.Subscribe
 import org.greenrobot.eventbus.ThreadMode
@@ -98,7 +100,12 @@ class MainActivity : SimpleActivity() {
 
         checkAndDeleteOldRecycleBinMessages()
         clearAllMessagesIfNeeded {
-            loadMessages()
+            // SMS-3-TOUCHPOINT 2/3: posture is answered before the
+            // message flow starts, because the answer decides whether
+            // the default SMS role may be requested at all.
+            ensureRolePosture {
+                loadMessages()
+            }
         }
 
         if (checkAppSideloading()) {
@@ -215,6 +222,13 @@ class MainActivity : SimpleActivity() {
     }
 
     private fun loadMessages() {
+        // A posture that may not hold the default role goes straight to
+        // runtime permissions: the owner's own messenger stays default.
+        if (!rolePostureFromStoredName(config.rolePostureName).mayRequestDefaultRole) {
+            askPermissions()
+            return
+        }
+
         if (isQPlus()) {
             val roleManager = getSystemService(RoleManager::class.java)
             if (roleManager!!.isRoleAvailable(RoleManager.ROLE_SMS)) {
