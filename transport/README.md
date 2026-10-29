@@ -807,3 +807,25 @@ guard over that install: its failures are proven against
 manifests with each requirement stripped in turn, so a future
 merge or repackaging that drops a declaration fails here
 instead of at a phone.
+
+## Upstream touchpoint registry (SMS-32, ≤5, tagged in code)
+
+None — zero upstream files are modified in this slice.
+Everything in this slice is a change to this track's own
+HeldArrival.kt in the app-side
+org.fossify.messages.transport package, plus this README.
+The arrival caller now counts a hold only when its store
+reports durable. A failed commit can still leave the
+in-memory preferences holding the new queue, so the
+read-back the caller previously trusted alone would report
+an arrival held that a restart would lose, and would
+enqueue a drain for it. On a failed store the caller
+writes the pre-hold queue back before reporting the
+arrival unheld, so a later caller in the same process
+finds exactly the queue that was durably held before the
+arrival, and no drain is enqueued for an undurable hold.
+A successful store keeps the previous behaviour: the
+arrival reads back held and its drain is enqueued. This
+slice changes no other caller: the inbound drain's
+credential-guard closure remains a separate hardening
+candidate.

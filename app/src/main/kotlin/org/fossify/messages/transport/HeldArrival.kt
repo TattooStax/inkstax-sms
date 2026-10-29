@@ -47,6 +47,15 @@ private const val HELD_DRAIN_WORK_NAME = "held_inbound_drain"
  * the held queue storage), so a later pairing never drains
  * this pairing's messages under its own credential.
  *
+ * A hold counts only when its store reports durable: a
+ * failed commit can still leave the in-memory preferences
+ * holding the new queue, so a read-back alone would report
+ * an arrival held that a restart would lose, and would
+ * enqueue a drain for it. On a failed store the pre-hold
+ * queue is written back before the arrival is reported
+ * unheld, so a later caller in this process finds exactly
+ * the queue that was durably held before this arrival.
+ *
  * Returns whether the arrival is held in the stored queue
  * when the call returns — the drain is enqueued only for a
  * held arrival — and the receivers act on neither outcome:
@@ -59,8 +68,14 @@ fun Context.holdAndDrainInboundArrival(message: InboundSms): Boolean {
         if (storedDeviceCredential() == null) {
             false
         } else {
-            storeHeldInboundQueue(heldQueueAfterArrival(storedHeldInboundQueue(), message))
-            storedHeldInboundQueue().any { it.sourceId == held.sourceId }
+            val before = storedHeldInboundQueue()
+            val stored = storeHeldInboundQueue(heldQueueAfterArrival(before, message))
+            if (stored) {
+                storedHeldInboundQueue().any { it.sourceId == held.sourceId }
+            } else {
+                storeHeldInboundQueue(before)
+                false
+            }
         }
     }
     if (isHeld) {
