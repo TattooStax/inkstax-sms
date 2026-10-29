@@ -81,6 +81,7 @@ class PairingExchangeWireTest {
                 """{"endpoint_base":"https://brain.example","endpoint_base":"https://brain.example","device_id":"device-1","secret":"secret-abc"}"""
             )
         )
+        assertEquals(malformed, pairingExchangeOutcomeFor(offer, 200, successBody(secret = "sec\\u００４１ret")))
         assertEquals(malformed, pairingExchangeOutcomeFor(offer, 200, successBody() + " trailing"))
         assertEquals(malformed, pairingExchangeOutcomeFor(offer, 200, successBody() + ","))
     }

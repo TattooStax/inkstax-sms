@@ -271,7 +271,7 @@ private class FlatJsonReader(private val text: String) {
         }
         var code = 0
         repeat(4) {
-            val digit = Character.digit(text[index], 16)
+            val digit = hexDigit(text[index])
             if (digit < 0) {
                 return null
             }
@@ -279,6 +279,21 @@ private class FlatJsonReader(private val text: String) {
             index++
         }
         return code.toChar()
+    }
+
+    /**
+     * The value of one ASCII hex digit, or -1 for anything else.
+     * A broader digit test would also accept non-ASCII digits and
+     * letters, and an escape spelled with those is not JSON —
+     * it must read as malformed, never decode into a value.
+     */
+    private fun hexDigit(char: Char): Int {
+        return when (char) {
+            in '0'..'9' -> char - '0'
+            in 'a'..'f' -> char - 'a' + 10
+            in 'A'..'F' -> char - 'A' + 10
+            else -> -1
+        }
     }
 
     private fun consume(expected: Char): Boolean {
