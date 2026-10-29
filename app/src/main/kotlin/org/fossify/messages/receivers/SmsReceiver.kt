@@ -28,6 +28,7 @@ import org.fossify.messages.helpers.refreshConversations
 import org.fossify.messages.helpers.refreshMessages
 import org.fossify.messages.models.Message
 import org.fossify.messages.transport.LocalInboundSink
+import org.fossify.messages.transport.holdAndDrainInboundArrival
 
 class SmsReceiver : BroadcastReceiver() {
 
@@ -154,16 +155,18 @@ class SmsReceiver : BroadcastReceiver() {
             threadId = threadId,
             bitmap = bitmap
         )
+        val inbound = InboundSms(
+            sender = address, body = body, receivedAtMillis = date,
+            subscriptionId = subscriptionId,
+            // insertNewSMS returns 0L when the provider insert failed; that sentinel
+            // is not a provider row, so the seam must see an unknown id, not "sms:0".
+            providerId = newMessageId.takeIf { it != 0L }, threadId = threadId
+        )
         // SMS-2-TOUCHPOINT 1/2: inbound SMS passes through the :transport seam's local
         // binding after local persistence, so later bindings share this entry point.
-        LocalInboundSink().onInbound(
-            InboundSms(
-                sender = address, body = body, receivedAtMillis = date,
-                subscriptionId = subscriptionId,
-                // insertNewSMS returns 0L when the provider insert failed; that sentinel
-                // is not a provider row, so the seam must see an unknown id, not "sms:0".
-                providerId = newMessageId.takeIf { it != 0L }, threadId = threadId
-            )
-        )
+        LocalInboundSink().onInbound(inbound)
+        // SMS-25-TOUCHPOINT 1/3: a paired phone holds the arrival and attempts its
+        // delivery to the brain at once, on this receiver's background thread.
+        context.holdAndDrainInboundArrival(inbound)
     }
 }

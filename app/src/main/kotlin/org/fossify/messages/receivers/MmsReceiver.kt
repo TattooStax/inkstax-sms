@@ -30,6 +30,7 @@ import org.fossify.messages.helpers.refreshConversations
 import org.fossify.messages.helpers.refreshMessages
 import org.fossify.messages.models.Message
 import org.fossify.messages.transport.LocalInboundSink
+import org.fossify.messages.transport.holdAndDrainInboundArrival
 
 class MmsReceiver : MmsReceivedReceiver() {
 
@@ -98,15 +99,18 @@ class MmsReceiver : MmsReceivedReceiver() {
             bitmap = glideBitmap
         )
 
+        val inbound = InboundSms(
+            sender = address, body = mms.body, receivedAtMillis = mms.date * 1000L,
+            subscriptionId = mms.subscriptionId, kind = InboundKind.MMS,
+            providerId = mms.id, threadId = mms.threadId
+        )
         // SMS-2-TOUCHPOINT 2/2: MMS arrivals pass through the seam so V1 classifies them
         // NOT_FORWARDED instead of silently dropping them; media stays in the provider store.
-        val inboundOutcome = LocalInboundSink().onInbound(
-            InboundSms(
-                sender = address, body = mms.body, receivedAtMillis = mms.date * 1000L,
-                subscriptionId = mms.subscriptionId, kind = InboundKind.MMS,
-                providerId = mms.id, threadId = mms.threadId
-            )
-        )
+        val inboundOutcome = LocalInboundSink().onInbound(inbound)
+        // SMS-25-TOUCHPOINT 3/3: every arrival passes through the arrival caller, and
+        // the caller's holding rule is what keeps an MMS arrival unheld — V1 does not
+        // forward MMS, so this call holds nothing and drains nothing for it.
+        context.holdAndDrainInboundArrival(inbound)
         if (inboundOutcome.disposition == InboundDisposition.NOT_FORWARDED) {
             // Surface the skipped forwarding visibly, distinct from a handled message.
             context.toast(id = R.string.mms_not_forwarded, length = Toast.LENGTH_LONG)
