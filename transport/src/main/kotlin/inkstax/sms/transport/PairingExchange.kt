@@ -56,7 +56,7 @@ data class DeviceCredential(
  * origins, as Pairing.kt returns them from a scanned offer.
  */
 private fun isEndpointBase(candidate: String?): Boolean {
-    val value = candidate?.trim().orEmpty()
+    val value = candidate.orEmpty()
     if (value.isEmpty() || value.any { it.isWhitespace() }) {
         return false
     }
@@ -75,10 +75,11 @@ private fun isEndpointBase(candidate: String?): Boolean {
 
 /**
  * Whether a credential field is a usable opaque value: present and
- * free of whitespace, exactly as given. Callers that accept outside
- * input trim it before constructing a credential; this check itself
- * must not trim, or a stored value carrying spaces would pass a
- * pre-use check while the value actually used still carries them.
+ * free of whitespace, exactly as given. Credential values are
+ * exact — no path in this file trims them, because trimming would
+ * silently turn one key into a different key instead of rejecting
+ * a malformed value, and a value carrying spaces must fail every
+ * check rather than pass as its trimmed spelling.
  */
 private fun isOpaqueValue(candidate: String?): Boolean {
     val value = candidate.orEmpty()
@@ -103,9 +104,9 @@ fun exchangedCredentialFor(
     returnedDeviceId: String?,
     returnedSecret: String?
 ): DeviceCredential? {
-    val endpoint = returnedEndpointBase?.trim().orEmpty()
-    val deviceId = returnedDeviceId?.trim().orEmpty()
-    val secret = returnedSecret?.trim().orEmpty()
+    val endpoint = returnedEndpointBase.orEmpty()
+    val deviceId = returnedDeviceId.orEmpty()
+    val secret = returnedSecret.orEmpty()
     if (endpoint != offer.endpointBase || !isEndpointBase(endpoint)) {
         return null
     }
@@ -172,13 +173,13 @@ fun deviceCredentialFromStored(
     storedSecret: String?,
     onDeviceTokenDeviceId: String?
 ): DeviceCredential? {
-    val endpoint = storedEndpointBase?.trim().orEmpty()
-    val deviceId = storedDeviceId?.trim().orEmpty()
-    val secret = storedSecret?.trim().orEmpty()
+    val endpoint = storedEndpointBase.orEmpty()
+    val deviceId = storedDeviceId.orEmpty()
+    val secret = storedSecret.orEmpty()
     if (!isEndpointBase(endpoint) || !isOpaqueValue(deviceId) || !isOpaqueValue(secret)) {
         return null
     }
-    if (onDeviceTokenDeviceId?.trim().orEmpty() != deviceId) {
+    if (onDeviceTokenDeviceId.orEmpty() != deviceId) {
         return null
     }
     return DeviceCredential(endpointBase = endpoint, deviceId = deviceId, secret = secret)
@@ -194,7 +195,7 @@ fun isCredentialUsableFor(credential: DeviceCredential?, endpointBase: String?):
     if (credential == null) {
         return false
     }
-    return credential.endpointBase == endpointBase?.trim().orEmpty() &&
+    return credential.endpointBase == endpointBase.orEmpty() &&
         isEndpointBase(credential.endpointBase) &&
         isOpaqueValue(credential.deviceId) &&
         isOpaqueValue(credential.secret)

@@ -35,6 +35,8 @@ class PairingExchangeTest {
         assertNull(exchangedCredentialFor(offer, "https://brain.example", "device-1", null))
         assertNull(exchangedCredentialFor(offer, "https://brain.example", "device 1", "secret-abc"))
         assertNull(exchangedCredentialFor(offer, "https://brain.example", "device-1", "secret abc"))
+        assertNull(exchangedCredentialFor(offer, "https://brain.example", "device-1", " secret-abc "))
+        assertNull(exchangedCredentialFor(offer, " https://brain.example", "device-1", "secret-abc"))
     }
 
     @Test
@@ -82,6 +84,8 @@ class PairingExchangeTest {
         assertNull(deviceCredentialFromStored("https://brain.example", "device-1", "secret-abc", null))
         assertNull(deviceCredentialFromStored("https://brain.example", "device-1", "secret-abc", ""))
         assertNull(deviceCredentialFromStored("https://brain.example", "device-1", "secret-abc", "device-2"))
+        assertNull(deviceCredentialFromStored("https://brain.example", "device-1", " secret-abc ", "device-1"))
+        assertNull(deviceCredentialFromStored("https://brain.example", "device-1", "secret-abc", " device-1 "))
     }
 
     @Test
