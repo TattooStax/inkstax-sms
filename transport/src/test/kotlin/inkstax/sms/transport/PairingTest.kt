@@ -207,4 +207,15 @@ class PairingTest {
         assertFalse(isPairingCodeFormat("12345a"))
         assertFalse(isPairingCodeFormat("123 456"))
     }
+
+    @Test
+    fun `the fallback code accepts only ASCII digits`() {
+        // Arabic-Indic, Devanagari, and fullwidth digits are digits to
+        // a broad digit test, but the brain issues ASCII codes only, so
+        // a code spelled with them is not a code it issued.
+        assertFalse(isPairingCodeFormat("١٢٣٤٥٦"))
+        assertFalse(isPairingCodeFormat("१२३४५६"))
+        assertFalse(isPairingCodeFormat("１２３４５６"))
+        assertFalse(isPairingCodeFormat("12345٦"))
+    }
 }

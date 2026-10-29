@@ -246,12 +246,15 @@ fun pairingStateAfter(current: PairingState, event: PairingEvent): PairingState 
 
 /**
  * Whether a typed fallback code has the pairing code's shape:
- * exactly [PAIRING_CODE_LENGTH] digits once surrounding whitespace
- * from typing is trimmed. The format check is all that happens
- * here — a well-shaped code still has to be exchanged, and the
- * token rules above decide whether it is accepted.
+ * exactly [PAIRING_CODE_LENGTH] ASCII digits once surrounding
+ * whitespace from typing is trimmed. Only ASCII digits count:
+ * the brain issues codes in ASCII, and a broader digit test
+ * would wave through a spelling in another script's digits
+ * that no issued code can match. The format check is all that
+ * happens here — a well-shaped code still has to be exchanged,
+ * and the token rules above decide whether it is accepted.
  */
 fun isPairingCodeFormat(candidate: String?): Boolean {
     val code = candidate?.trim().orEmpty()
-    return code.length == PAIRING_CODE_LENGTH && code.all { it.isDigit() }
+    return code.length == PAIRING_CODE_LENGTH && code.all { it in '0'..'9' }
 }
