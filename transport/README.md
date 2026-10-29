@@ -387,7 +387,7 @@ later slices.
 ## Upstream touchpoint registry (SMS-15, ≤5, tagged in code)
 
 None — zero upstream files are modified in this slice.
-Everything in this slice is one new file
+Everything in this slice is two new files
 (`HeartbeatBinding.kt` in the app-side
 `org.fossify.messages.transport` package) plus this README.
 The binding performs the heartbeat SMS-14 defines with the
@@ -500,7 +500,7 @@ queue they drain, act on these definitions in later slices.
 ## Upstream touchpoint registry (SMS-20, ≤5, tagged in code)
 
 None — zero upstream files are modified in this slice.
-Everything in this slice is one new file
+Everything in this slice is two new files
 (`InboundDeliveryBinding.kt` in the app-side
 `org.fossify.messages.transport` package) plus this README.
 The binding performs the inbound delivery SMS-18 defines with
@@ -517,7 +517,7 @@ binding in the same shape, act on it in later slices.
 ## Upstream touchpoint registry (SMS-21, ≤5, tagged in code)
 
 None — zero upstream files are modified in this slice.
-Everything in this slice is one new file
+Everything in this slice is two new files
 (`OutboundAckBinding.kt` in the app-side
 `org.fossify.messages.transport` package) plus this README.
 The binding performs the outbound ack report SMS-19 defines
@@ -545,7 +545,7 @@ these definitions in later slices.
 ## Upstream touchpoint registry (SMS-23, ≤5, tagged in code)
 
 None — zero upstream files are modified in this slice.
-Everything in this slice is one new file
+Everything in this slice is two new files
 (`HeldQueueStorage.kt` in the app-side
 `org.fossify.messages.transport` package) plus this README.
 The storage persists the queue SMS-22 defines in the app shared
@@ -559,3 +559,23 @@ success only after a verifying read-back. SMS-23 wires no
 caller and drains nothing — the drain caller that delivers the
 head through SMS-20's binding, and the pending outbound
 report queue, act on this storage in later slices.
+
+## Upstream touchpoint registry (SMS-24, ≤5, tagged in code)
+
+None — zero upstream files are modified in this slice.
+Everything in this slice is two new files
+(`HeldQueueDrain.kt` and `HeldQueueDrainResult.kt` in the app-side
+`org.fossify.messages.transport` package) plus this README.
+The drain caller delivers the stored queue SMS-23 persists
+through the inbound delivery binding SMS-20 performs, in held
+order, folding each answer back through the SMS-22 release
+rule and persisting each release before the next message is
+attempted. Only the brain's ack releases a head; the first
+result that is not an ack stops the drain with the head and
+everything behind it still held in order, and an ack whose
+release cannot be persisted reports its own outcome, because
+the message stays held for a redelivery against the same
+source id. SMS-24 wires no trigger of its own — the arrival
+caller that holds a message on arrival, any scheduled retry
+of a blocked drain, and the pending outbound report queue act
+on this caller in later slices.
