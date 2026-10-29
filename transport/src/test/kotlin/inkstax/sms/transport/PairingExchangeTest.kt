@@ -100,6 +100,8 @@ class PairingExchangeTest {
         assertFalse(isCredentialUsableFor(credential, null))
         assertFalse(isCredentialUsableFor(null, "https://brain.example"))
         assertFalse(isCredentialUsableFor(credential.copy(secret = ""), "https://brain.example"))
+        assertFalse(isCredentialUsableFor(credential.copy(secret = " secret-abc "), "https://brain.example"))
+        assertFalse(isCredentialUsableFor(credential.copy(deviceId = " device-1 "), "https://brain.example"))
     }
 
     @Test

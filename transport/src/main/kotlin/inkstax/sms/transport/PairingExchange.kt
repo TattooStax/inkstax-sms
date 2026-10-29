@@ -73,9 +73,15 @@ private fun isEndpointBase(candidate: String?): Boolean {
         (uri.path.isNullOrEmpty() || uri.path == "/")
 }
 
-/** Whether a credential field is a usable opaque value: present and free of whitespace. */
+/**
+ * Whether a credential field is a usable opaque value: present and
+ * free of whitespace, exactly as given. Callers that accept outside
+ * input trim it before constructing a credential; this check itself
+ * must not trim, or a stored value carrying spaces would pass a
+ * pre-use check while the value actually used still carries them.
+ */
 private fun isOpaqueValue(candidate: String?): Boolean {
-    val value = candidate?.trim().orEmpty()
+    val value = candidate.orEmpty()
     return value.isNotEmpty() && value.none { it.isWhitespace() }
 }
 
