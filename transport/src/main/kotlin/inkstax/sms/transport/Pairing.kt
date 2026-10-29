@@ -114,8 +114,11 @@ fun pairingOfferFromQrPayload(rawPayload: String?): PairingOffer? {
  * The decoder validates its own escapes instead of relying on the
  * payload reader's URI parse having rejected loose spellings
  * first, so it stays correct wherever a value reaches it from.
+ * It is internal rather than private so the module's tests can
+ * hold the decoder to that contract directly, with no URI parse
+ * in front of it.
  */
-private fun percentDecoded(value: String): String? {
+internal fun percentDecoded(value: String): String? {
     if ('%' !in value) {
         return value
     }

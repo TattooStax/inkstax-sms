@@ -271,7 +271,11 @@ accepts non-ASCII digits and letters, so an escape spelled
 with those can never decode into a token byte. The payload
 reader's URI parse already rejects such spellings today; the
 decoder no longer depends on that validation staying in front
-of it.
+of it. The decoder is internal so the module's tests can hold
+it to that contract directly, with no URI parse in front of
+it — those decoder-level tests fail against the broad digit
+test they replace, which decoded the Arabic-Indic spelling of
+an escape into a control byte instead of rejecting it.
 
 SMS-3 note: the dedicated posture keeps the upstream startup flow
 unchanged (default role requested, declining it exits). The
