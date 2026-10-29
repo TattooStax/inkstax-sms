@@ -54,6 +54,7 @@ sealed interface PairingExchangeBindingResult {
  * attempt stays open and the same offer can be retried inside the
  * token's lifetime.
  */
+@Suppress("SwallowedException")
 fun Context.performPairingExchange(offer: PairingOffer): PairingExchangeBindingResult {
     val request = pairingExchangeRequestFor(offer)
     var connection: HttpURLConnection? = null
