@@ -43,6 +43,29 @@ class PostureTest {
     }
 
     @Test
+    fun `stored answer counts only with its matching on-device token`() {
+        assertEquals(
+            RolePosture.DEFAULT_ROLE,
+            rolePostureFromStoredAnswer("DEFAULT_ROLE", "DEFAULT_ROLE")
+        )
+        assertEquals(
+            RolePosture.PERMISSIONS_ONLY,
+            rolePostureFromStoredAnswer("PERMISSIONS_ONLY", "PERMISSIONS_ONLY")
+        )
+        // A backup-restored answer arrives without the token: re-ask.
+        assertEquals(RolePosture.UNSET, rolePostureFromStoredAnswer("DEFAULT_ROLE", null))
+        assertEquals(RolePosture.UNSET, rolePostureFromStoredAnswer("DEFAULT_ROLE", ""))
+        // A token naming a different posture does not validate either.
+        assertEquals(
+            RolePosture.UNSET,
+            rolePostureFromStoredAnswer("DEFAULT_ROLE", "PERMISSIONS_ONLY")
+        )
+        // Even a matching pair cannot resurrect an unrecognised name.
+        assertEquals(RolePosture.UNSET, rolePostureFromStoredAnswer("NOPE", "NOPE"))
+        assertEquals(RolePosture.UNSET, rolePostureFromStoredAnswer(null, null))
+    }
+
+    @Test
     fun `unset is the only unanswered posture`() {
         assertFalse(RolePosture.UNSET.isAnswered)
         assertTrue(RolePosture.PERMISSIONS_ONLY.isAnswered)

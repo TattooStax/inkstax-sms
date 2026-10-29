@@ -56,3 +56,21 @@ fun rolePostureForDedicatedBusinessPhone(isDedicatedBusinessPhone: Boolean): Rol
 fun rolePostureFromStoredName(storedName: String?): RolePosture {
     return RolePosture.entries.firstOrNull { it.name == storedName } ?: RolePosture.UNSET
 }
+
+/**
+ * Reads the posture answer as setup consent given on THIS device.
+ * The answer itself lives in app preferences, which Android backup
+ * can restore onto a different phone; the setup question is
+ * per-device consent, so a stored answer only counts when the
+ * on-device token (kept in storage backup never carries) names the
+ * same posture. A restored answer without its token reads back as
+ * [RolePosture.UNSET] and the question is asked again on that
+ * device, instead of a dedicated phone's answer silently turning a
+ * personal phone toward the default role.
+ */
+fun rolePostureFromStoredAnswer(storedName: String?, onDeviceTokenName: String?): RolePosture {
+    if (storedName == null || storedName != onDeviceTokenName) {
+        return RolePosture.UNSET
+    }
+    return rolePostureFromStoredName(storedName)
+}

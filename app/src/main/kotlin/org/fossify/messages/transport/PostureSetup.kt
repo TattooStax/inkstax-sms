@@ -1,8 +1,11 @@
 package org.fossify.messages.transport
 
 import android.app.Activity
+import android.content.Context
+import inkstax.sms.transport.RolePosture
 import inkstax.sms.transport.rolePostureForDedicatedBusinessPhone
-import inkstax.sms.transport.rolePostureFromStoredName
+import inkstax.sms.transport.rolePostureFromStoredAnswer
+import java.io.File
 import org.fossify.commons.dialogs.RadioGroupDialog
 import org.fossify.commons.models.RadioItem
 import org.fossify.messages.R
@@ -10,6 +13,30 @@ import org.fossify.messages.extensions.config
 
 private const val POSTURE_ITEM_DEDICATED = 1
 private const val POSTURE_ITEM_PERSONAL = 2
+private const val POSTURE_TOKEN_FILE = "role_posture_token"
+
+/**
+ * The posture this device actually runs under: the stored answer,
+ * counted only with its on-device token. The token lives in
+ * no-backup storage because app backup can restore the preference
+ * onto another phone, and the setup question is per-device consent —
+ * a restored answer must re-ask, never inherit (see
+ * [rolePostureFromStoredAnswer] in :transport).
+ */
+fun Context.storedRolePosture(): RolePosture {
+    val tokenName = runCatching {
+        File(noBackupFilesDir, POSTURE_TOKEN_FILE).readText().trim()
+    }.getOrNull()
+    return rolePostureFromStoredAnswer(config.rolePostureName, tokenName)
+}
+
+/** Records the setup answer and its on-device token together. */
+fun Context.storeRolePosture(posture: RolePosture) {
+    config.rolePostureName = posture.name
+    runCatching {
+        File(noBackupFilesDir, POSTURE_TOKEN_FILE).writeText(posture.name)
+    }
+}
 
 /**
  * The one posture setup question (SMS-3), asked until it is answered:
@@ -24,7 +51,7 @@ private const val POSTURE_ITEM_PERSONAL = 2
  * again on the next launch and the message flow does not start.
  */
 fun Activity.ensureRolePosture(onPostureReady: () -> Unit) {
-    if (rolePostureFromStoredName(config.rolePostureName).isAnswered) {
+    if (storedRolePosture().isAnswered) {
         onPostureReady()
         return
     }
@@ -40,7 +67,7 @@ fun Activity.ensureRolePosture(onPostureReady: () -> Unit) {
         titleId = R.string.posture_question
     ) { any ->
         val isDedicated = (any as Int) == POSTURE_ITEM_DEDICATED
-        config.rolePostureName = rolePostureForDedicatedBusinessPhone(isDedicated).name
+        storeRolePosture(rolePostureForDedicatedBusinessPhone(isDedicated))
         onPostureReady()
     }
 }

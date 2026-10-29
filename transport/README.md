@@ -81,11 +81,22 @@ other upstream file is modified.
 | 1 | `app/src/main/kotlin/org/fossify/messages/helpers/Config.kt` | Stores the posture answer as the posture name string (`rolePostureName`) |
 | 2 | `app/src/main/kotlin/org/fossify/messages/activities/MainActivity.kt` | Startup runs the one posture question (via `ensureRolePosture` in the app-side transport package) before the message flow; `loadMessages` requests the default SMS role only when the posture allows it and otherwise goes straight to runtime permissions |
 | 3 | `app/src/main/res/values/strings.xml` | The posture question string and its two answer strings |
+| 4 | `app/src/main/AndroidManifest.xml` | Registers `SmsReceivedReceiver` for SMS_RECEIVED, the permissions-only posture's inbound copy |
 
 SMS-3 note: the dedicated posture keeps the upstream startup flow
 unchanged (default role requested, declining it exits). The
-personal posture is new behaviour: the default-role request is
-skipped entirely so the owner's own messenger stays default.
-Subscription pinning for the personal posture is policy in
-`:transport` (`requiresPinnedSubscription`); its enforcement at
-send selection is a later slice, not claimed here.
+personal posture is new behaviour end to end, because a non-default
+app lives under different platform rules: the default-role request
+is skipped entirely so the owner's own messenger stays default;
+inbound arrives through a new SMS_RECEIVED receiver that hands a
+copy to the seam and writes nothing (the default app owns the
+provider row and the notification); outbound sends through
+SmsManager directly from the local binding, because the existing
+send path persists to the provider before sending and that write
+is denied to non-default apps. The posture answer is per-device
+consent: it is stored with a token in no-backup storage, so an
+answer restored from backup onto another phone reads back as
+UNSET and the question is asked again there. Subscription pinning
+for the personal posture is policy in `:transport`
+(`requiresPinnedSubscription`); its enforcement at send selection
+is a later slice, not claimed here.

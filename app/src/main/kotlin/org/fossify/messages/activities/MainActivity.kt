@@ -1,8 +1,10 @@
 package org.fossify.messages.activities
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.app.role.RoleManager
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ShortcutInfo
 import android.content.pm.ShortcutManager
 import android.graphics.drawable.Icon
@@ -11,7 +13,8 @@ import android.os.Bundle
 import android.provider.Telephony
 import android.text.TextUtils
 import androidx.appcompat.content.res.AppCompatResources
-import inkstax.sms.transport.rolePostureFromStoredName
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import org.fossify.commons.dialogs.PermissionRequiredDialog
 import org.fossify.commons.extensions.adjustAlpha
 import org.fossify.commons.extensions.appLaunched
@@ -72,6 +75,7 @@ import org.fossify.messages.models.Events
 import org.fossify.messages.models.Message
 import org.fossify.messages.models.SearchResult
 import org.fossify.messages.transport.ensureRolePosture
+import org.fossify.messages.transport.storedRolePosture
 import org.greenrobot.eventbus.EventBus
 import org.greenrobot.eventbus.Subscribe
 import org.greenrobot.eventbus.ThreadMode
@@ -80,6 +84,7 @@ class MainActivity : SimpleActivity() {
     override var isSearchBarEnabled = true
     
     private val MAKE_DEFAULT_APP_REQUEST = 1
+    private val receiveSmsPermissionRequest = 2
 
     private var storedTextColor = 0
     private var storedFontSize = 0
@@ -224,7 +229,23 @@ class MainActivity : SimpleActivity() {
     private fun loadMessages() {
         // A posture that may not hold the default role goes straight to
         // runtime permissions: the owner's own messenger stays default.
-        if (!rolePostureFromStoredName(config.rolePostureName).mayRequestDefaultRole) {
+        if (!storedRolePosture().mayRequestDefaultRole) {
+            // SMS_RECEIVED is how a non-default app hears about incoming
+            // messages at all, so the permissions-only posture needs its
+            // runtime permission requested explicitly; the Fossify
+            // permission helper has no constant for it. If it is denied,
+            // the app still opens — inbound copies simply cannot arrive
+            // until the user grants it.
+            val receiveSmsGranted = ContextCompat.checkSelfPermission(
+                this, Manifest.permission.RECEIVE_SMS
+            ) == PackageManager.PERMISSION_GRANTED
+            if (!receiveSmsGranted) {
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(Manifest.permission.RECEIVE_SMS),
+                    receiveSmsPermissionRequest
+                )
+            }
             askPermissions()
             return
         }

@@ -1,14 +1,17 @@
 package org.fossify.messages.transport
 
 import android.content.Context
+import android.telephony.PhoneNumberUtils
 import android.widget.Toast.LENGTH_LONG
 import inkstax.sms.transport.MessageTransport
 import inkstax.sms.transport.OutboundSms
+import inkstax.sms.transport.RolePosture
 import inkstax.sms.transport.TransportOutcome
 import org.fossify.commons.extensions.toast
 import org.fossify.messages.R
 import org.fossify.messages.extensions.messagingUtils
 import org.fossify.messages.messaging.SmsException
+import org.fossify.messages.messaging.getSmsManager
 
 /**
  * The local binding of the bridge seam (SMS-1): SMS text is sent
@@ -30,6 +33,9 @@ class LocalMessageTransport(private val context: Context) : MessageTransport {
     // that total mapping is the seam's contract, so the generic catch is intentional.
     @Suppress("TooGenericExceptionCaught")
     override fun sendSms(message: OutboundSms): TransportOutcome {
+        if (context.storedRolePosture() == RolePosture.PERMISSIONS_ONLY) {
+            return sendSmsWithoutProviderRow(message)
+        }
         return try {
             context.messagingUtils.sendSmsMessage(
                 text = message.text,
@@ -41,6 +47,48 @@ class LocalMessageTransport(private val context: Context) : MessageTransport {
             TransportOutcome.Sent
         } catch (e: SmsException) {
             TransportOutcome.Failed(e.errorCode)
+        } catch (e: Exception) {
+            TransportOutcome.Failed(TransportOutcome.UNKNOWN_ERROR, e.message ?: e.toString())
+        }
+    }
+
+    /**
+     * The permissions-only send path. Only the default SMS app may
+     * write the telephony provider, and the path above persists
+     * before it sends — on a personal phone that insert is denied
+     * and the message never leaves. This posture therefore sends
+     * through SmsManager directly and writes no provider row. The
+     * trade-offs are platform-imposed, not chosen: no sent-copy in
+     * the provider for any app to show, and no delivery report,
+     * because both ride on the provider row and its pending intents.
+     * Error codes mirror the default path's, so callers keep their
+     * existing failure handling.
+     */
+    @Suppress("TooGenericExceptionCaught")
+    private fun sendSmsWithoutProviderRow(message: OutboundSms): TransportOutcome {
+        if (message.addresses.isEmpty()) {
+            return TransportOutcome.Failed(TransportOutcome.EMPTY_DESTINATION_ADDRESS)
+        }
+        return try {
+            val smsManager = getSmsManager(message.subscriptionId)
+            for (address in message.addresses) {
+                val destination = PhoneNumberUtils.stripSeparators(address)
+                if (destination.isEmpty()) {
+                    return TransportOutcome.Failed(TransportOutcome.EMPTY_DESTINATION_ADDRESS)
+                }
+                val parts = smsManager.divideMessage(message.text)
+                if (parts == null || parts.size < 1) {
+                    return TransportOutcome.Failed(TransportOutcome.ERROR_SENDING_MESSAGE)
+                }
+                if (parts.size == 1) {
+                    @Suppress("DEPRECATION")
+                    smsManager.sendTextMessage(destination, null, message.text, null, null)
+                } else {
+                    @Suppress("DEPRECATION")
+                    smsManager.sendMultipartTextMessage(destination, null, parts, null, null)
+                }
+            }
+            TransportOutcome.Sent
         } catch (e: Exception) {
             TransportOutcome.Failed(TransportOutcome.UNKNOWN_ERROR, e.message ?: e.toString())
         }
