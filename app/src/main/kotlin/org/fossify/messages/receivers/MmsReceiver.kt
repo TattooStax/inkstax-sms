@@ -4,6 +4,8 @@ import android.content.Context
 import android.net.Uri
 import com.bumptech.glide.Glide
 import com.klinker.android.send_message.MmsReceivedReceiver
+import inkstax.sms.transport.InboundKind
+import inkstax.sms.transport.InboundSms
 import org.fossify.commons.extensions.baseConfig
 import org.fossify.commons.extensions.getMyContactsCursor
 import org.fossify.commons.extensions.isNumberBlocked
@@ -24,6 +26,7 @@ import org.fossify.messages.helpers.ReceiverUtils.isMessageFilteredOut
 import org.fossify.messages.helpers.refreshConversations
 import org.fossify.messages.helpers.refreshMessages
 import org.fossify.messages.models.Message
+import org.fossify.messages.transport.LocalInboundSink
 
 class MmsReceiver : MmsReceivedReceiver() {
 
@@ -90,6 +93,16 @@ class MmsReceiver : MmsReceivedReceiver() {
             body = mms.body,
             threadId = mms.threadId,
             bitmap = glideBitmap
+        )
+
+        // SMS-2-TOUCHPOINT 2/2: MMS arrivals pass through the seam so V1 classifies them
+        // NOT_FORWARDED instead of silently dropping them; media stays in the provider store.
+        LocalInboundSink().onInbound(
+            InboundSms(
+                sender = address, body = mms.body, receivedAtMillis = mms.date * 1000L,
+                subscriptionId = mms.subscriptionId, kind = InboundKind.MMS,
+                providerId = mms.id, threadId = mms.threadId
+            )
         )
 
         val conversation = context.getConversations(mms.threadId).firstOrNull() ?: return
