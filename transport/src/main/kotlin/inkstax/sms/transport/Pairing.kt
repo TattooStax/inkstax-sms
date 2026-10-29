@@ -61,11 +61,14 @@ data class PairingOffer(
 /**
  * Reads a scanned QR payload as a [PairingOffer], or returns null
  * when it is not one. Only the exact issued shape counts: an HTTPS
- * URL with a host, the pairing path, no embedded user info, and a
- * single non-blank token parameter with no whitespace. Anything
- * else — a plain web link, an http URL, a token split across
- * repeated parameters — reads back as no offer, so a stray QR can
- * never start a pairing against an endpoint nobody issued.
+ * URL with a host, the pairing path, no embedded user info, no
+ * fragment, and a single token parameter. The token value is
+ * percent-decoded before it is validated or returned — the offer
+ * carries the token itself, never its encoded spelling, and an
+ * encoded blank is still blank. Anything else — a plain web link,
+ * an http URL, a token split across repeated parameters — reads
+ * back as no offer, so a stray QR can never start a pairing
+ * against an endpoint nobody issued.
  */
 fun pairingOfferFromQrPayload(rawPayload: String?): PairingOffer? {
     val payload = rawPayload?.trim().orEmpty()
@@ -80,7 +83,7 @@ fun pairingOfferFromQrPayload(rawPayload: String?): PairingOffer? {
     if (!uri.scheme.equals("https", ignoreCase = true) || uri.host.isNullOrBlank()) {
         return null
     }
-    if (uri.userInfo != null || uri.path != PAIRING_PATH) {
+    if (uri.userInfo != null || uri.rawFragment != null || uri.path != PAIRING_PATH) {
         return null
     }
     val queryPairs = uri.rawQuery?.split('&')?.filter { it.isNotEmpty() }.orEmpty()
@@ -91,13 +94,46 @@ fun pairingOfferFromQrPayload(rawPayload: String?): PairingOffer? {
     if (pair.size != 2 || pair[0] != PAIRING_TOKEN_PARAM) {
         return null
     }
-    val token = pair[1]
+    val token = percentDecoded(pair[1]) ?: return null
     if (token.isBlank() || token.any { it.isWhitespace() }) {
         return null
     }
     val hostPart = if (uri.host.contains(':') && !uri.host.startsWith('[')) "[${uri.host}]" else uri.host
     val portPart = if (uri.port >= 0) ":${uri.port}" else ""
     return PairingOffer(endpointBase = "https://$hostPart$portPart", token = token)
+}
+
+/**
+ * Percent-decodes one query value, or returns null on a malformed
+ * escape. Only `%` escapes are decoded; a literal `+` stays a plus,
+ * because the token is a credential, not form text, and rewriting
+ * it would hand the exchange a different token than the QR carried.
+ */
+private fun percentDecoded(value: String): String? {
+    if ('%' !in value) {
+        return value
+    }
+    val bytes = ArrayList<Byte>(value.length)
+    var index = 0
+    while (index < value.length) {
+        val char = value[index]
+        if (char == '%') {
+            if (index + 2 >= value.length) {
+                return null
+            }
+            val high = Character.digit(value[index + 1], 16)
+            val low = Character.digit(value[index + 2], 16)
+            if (high < 0 || low < 0) {
+                return null
+            }
+            bytes.add((high * 16 + low).toByte())
+            index += 3
+        } else {
+            char.toString().toByteArray(Charsets.UTF_8).forEach { bytes.add(it) }
+            index++
+        }
+    }
+    return String(bytes.toByteArray(), Charsets.UTF_8)
 }
 
 enum class PairingTokenState {

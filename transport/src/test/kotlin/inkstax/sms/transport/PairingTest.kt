@@ -66,6 +66,32 @@ class PairingTest {
     }
 
     @Test
+    fun `a percent-encoded token is decoded before it is returned`() {
+        val offer = pairingOfferFromQrPayload("https://brain.example/companion/start?t=abc%2F123%3D")
+        assertEquals("abc/123=", offer?.token)
+        assertEquals("abc1", pairingOfferFromQrPayload("https://brain.example/companion/start?t=abc%31")?.token)
+    }
+
+    @Test
+    fun `an encoded blank or whitespace token is still no offer`() {
+        assertNull(pairingOfferFromQrPayload("https://brain.example/companion/start?t=%20"))
+        assertNull(pairingOfferFromQrPayload("https://brain.example/companion/start?t=a%20b"))
+    }
+
+    @Test
+    fun `a malformed percent escape is no offer`() {
+        assertNull(pairingOfferFromQrPayload("https://brain.example/companion/start?t=abc%ZZ"))
+        assertNull(pairingOfferFromQrPayload("https://brain.example/companion/start?t=abc%"))
+        assertNull(pairingOfferFromQrPayload("https://brain.example/companion/start?t=abc%2"))
+    }
+
+    @Test
+    fun `a pairing URL with a fragment is no offer`() {
+        assertNull(pairingOfferFromQrPayload("https://brain.example/companion/start?t=tok#extra"))
+        assertNull(pairingOfferFromQrPayload("https://brain.example/companion/start?t=tok#"))
+    }
+
+    @Test
     fun `a fresh unused token is usable`() {
         assertEquals(PairingTokenState.USABLE, pairingTokenStateAt(t0, t0, alreadyUsed = false))
         assertEquals(
