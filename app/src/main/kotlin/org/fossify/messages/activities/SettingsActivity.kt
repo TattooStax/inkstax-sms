@@ -48,6 +48,7 @@ import org.fossify.messages.helpers.LOCK_SCREEN_SENDER_MESSAGE
 import org.fossify.messages.helpers.MessagesImporter
 import org.fossify.messages.helpers.refreshConversations
 import org.fossify.messages.transport.confirmPairingDisconnect
+import org.fossify.messages.transport.ensureDrainRetrySchedule
 import org.fossify.messages.transport.ensureHeartbeatSchedule
 import org.fossify.messages.transport.hasStoredCredentialMaterial
 import org.fossify.messages.transport.launchPairingScan
@@ -172,6 +173,10 @@ class SettingsActivity : SimpleActivity() {
         // schedule — the recovery for a start the platform refused
         // while the app was backgrounded during pairing.
         ensureHeartbeatSchedule()
+        // SMS-30-TOUCHPOINT 1/1: a Settings visit also re-arms a
+        // paired phone's scheduled drain retry - the same
+        // foreground recovery as the heartbeat schedule above.
+        ensureDrainRetrySchedule()
         refreshDisconnectCompanionVisibility()
         binding.settingsDisconnectCompanionHolder.setOnClickListener {
             confirmPairingDisconnect {

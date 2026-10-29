@@ -122,6 +122,7 @@ private fun Activity.handleScannedPairingPayload(contents: String, onPaired: () 
                     // link this pairing created is the heartbeat
                     // service's whole reason to run.
                     startHeartbeatService()
+                    ensureDrainRetrySchedule()
                     // The host resumed before this background exchange
                     // finished, so any paired-state UI it refreshed on
                     // resume predates the stored credential; the
