@@ -1,4 +1,4 @@
-# :transport — the bridge seam (SMS-1, SMS-2, SMS-3, SMS-4, SMS-5, SMS-6, SMS-7, SMS-8, SMS-9, SMS-10, SMS-11)
+# :transport — the bridge seam (SMS-1, SMS-2, SMS-3, SMS-4, SMS-5, SMS-6, SMS-7, SMS-8, SMS-9, SMS-10, SMS-11), SMS-12
 
 Pure Kotlin/JVM module holding the InkStax SMS layer's one
 bridge seam. SMS-1 extracted the outbound side; SMS-2 adds the
@@ -36,6 +36,10 @@ inbound side with its local binding first.
   the pairing state transitions (an exchange succeeds only from a
   scanned offer, PAIRED is terminal, a fresh scan after expiry is
   the recovery), and the 6-digit typed fallback code's format.
+  The token's percent escapes are read as ASCII hex only
+  (SMS-12): a non-ASCII digit spelling is malformed, never a
+  different byte, and the decoder checks that itself instead of
+  relying on the URI parse in front of it.
   Pure definitions only: no scanner, no network exchange, and no
   credential storage lives here — a binding supplies the scanned
   text and exchange outcomes and acts on the states.
@@ -256,6 +260,22 @@ track's own app-side files (`CredentialStorage.kt`'s clear
 reports a verified result; the pairing single-flight guard
 moves into its own `PairingAttemptGuard.kt`, shared by the
 pairing attempt and the disconnect clear), and this README.
+
+## Upstream touchpoint registry (SMS-12, ≤5, tagged in code)
+
+None — zero upstream files are modified in this slice. The
+slice changes only `Pairing.kt` inside `:transport` and its
+test: the percent-decoder reads escape digits through a strict
+ASCII hex check instead of a broad digit test that also
+accepts non-ASCII digits and letters, so an escape spelled
+with those can never decode into a token byte. The payload
+reader's URI parse already rejects such spellings today; the
+decoder no longer depends on that validation staying in front
+of it. The decoder is internal so the module's tests can hold
+it to that contract directly, with no URI parse in front of
+it — those decoder-level tests fail against the broad digit
+test they replace, which decoded the Arabic-Indic spelling of
+an escape into a control byte instead of rejecting it.
 
 SMS-3 note: the dedicated posture keeps the upstream startup flow
 unchanged (default role requested, declining it exits). The

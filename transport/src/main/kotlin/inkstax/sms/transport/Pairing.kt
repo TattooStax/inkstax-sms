@@ -65,8 +65,11 @@ data class PairingOffer(
  * fragment, and a single token parameter. The token value is
  * percent-decoded before it is validated or returned — the offer
  * carries the token itself, never its encoded spelling, and an
- * encoded blank is still blank. Anything else — a plain web link,
- * an http URL, a token split across repeated parameters — reads
+ * encoded blank is still blank. Escapes are ASCII hex only: a
+ * digit or letter from another script is malformed, not a
+ * different spelling of the same byte. Anything else — a plain
+ * web link, an http URL, a token split across repeated
+ * parameters — reads
  * back as no offer, so a stray QR can never start a pairing
  * against an endpoint nobody issued.
  */
@@ -108,8 +111,14 @@ fun pairingOfferFromQrPayload(rawPayload: String?): PairingOffer? {
  * escape. Only `%` escapes are decoded; a literal `+` stays a plus,
  * because the token is a credential, not form text, and rewriting
  * it would hand the exchange a different token than the QR carried.
+ * The decoder validates its own escapes instead of relying on the
+ * payload reader's URI parse having rejected loose spellings
+ * first, so it stays correct wherever a value reaches it from.
+ * It is internal rather than private so the module's tests can
+ * hold the decoder to that contract directly, with no URI parse
+ * in front of it.
  */
-private fun percentDecoded(value: String): String? {
+internal fun percentDecoded(value: String): String? {
     if ('%' !in value) {
         return value
     }
@@ -121,8 +130,8 @@ private fun percentDecoded(value: String): String? {
             if (index + 2 >= value.length) {
                 return null
             }
-            val high = Character.digit(value[index + 1], 16)
-            val low = Character.digit(value[index + 2], 16)
+            val high = hexDigit(value[index + 1])
+            val low = hexDigit(value[index + 2])
             if (high < 0 || low < 0) {
                 return null
             }
@@ -134,6 +143,22 @@ private fun percentDecoded(value: String): String? {
         }
     }
     return String(bytes.toByteArray(), Charsets.UTF_8)
+}
+
+/**
+ * The value of one ASCII hex digit, or -1 for anything else.
+ * A broader digit test would also accept non-ASCII digits and
+ * letters, and an escape spelled with those is not an escape
+ * the brain issued — it must read as malformed, never decode
+ * into a byte of the token.
+ */
+private fun hexDigit(char: Char): Int {
+    return when (char) {
+        in '0'..'9' -> char - '0'
+        in 'a'..'f' -> char - 'a' + 10
+        in 'A'..'F' -> char - 'A' + 10
+        else -> -1
+    }
 }
 
 enum class PairingTokenState {

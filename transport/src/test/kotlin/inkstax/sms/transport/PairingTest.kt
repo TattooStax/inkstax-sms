@@ -86,6 +86,40 @@ class PairingTest {
     }
 
     @Test
+    fun `a percent escape spelled with non-ASCII digits is no offer`() {
+        // Arabic-Indic digits, Devanagari digits, and fullwidth hex
+        // letters all carry values a broad digit test would accept;
+        // none of them is the ASCII hex the brain issued, so an
+        // escape spelled with them is malformed, not a token byte.
+        assertNull(pairingOfferFromQrPayload("https://brain.example/companion/start?t=abc%\u0661\u0662"))
+        assertNull(pairingOfferFromQrPayload("https://brain.example/companion/start?t=abc%\u0967\u0968"))
+        assertNull(pairingOfferFromQrPayload("https://brain.example/companion/start?t=abc%\uFF21\uFF22"))
+        assertNull(pairingOfferFromQrPayload("https://brain.example/companion/start?t=abc%1\u0662"))
+    }
+
+    @Test
+    fun `the decoder itself rejects escapes spelled with non-ASCII digits`() {
+        // Straight at percentDecoded, with no URI parse in front of
+        // it: these spellings decode into bytes under a broad digit
+        // test, so this assertion holds the decoder's own
+        // strictness, not the parser's.
+        assertNull(percentDecoded("abc%\u0661\u0662"))
+        assertNull(percentDecoded("abc%\u0967\u0968"))
+        assertNull(percentDecoded("abc%\uFF21\uFF22"))
+        assertNull(percentDecoded("abc%1\u0662"))
+        assertNull(percentDecoded("abc%ZZ"))
+        assertNull(percentDecoded("abc%"))
+    }
+
+    @Test
+    fun `the decoder accepts ASCII escapes and leaves the rest exact`() {
+        assertEquals("abc/123=", percentDecoded("abc%2F123%3D"))
+        assertEquals("abc1", percentDecoded("abc%31"))
+        assertEquals("a+b", percentDecoded("a+b"))
+        assertEquals("plain", percentDecoded("plain"))
+    }
+
+    @Test
     fun `a pairing URL with a fragment is no offer`() {
         assertNull(pairingOfferFromQrPayload("https://brain.example/companion/start?t=tok#extra"))
         assertNull(pairingOfferFromQrPayload("https://brain.example/companion/start?t=tok#"))
