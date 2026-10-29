@@ -1,4 +1,4 @@
-# :transport — the bridge seam (SMS-1, SMS-2, SMS-3, SMS-4, SMS-5, SMS-6, SMS-7, SMS-8, SMS-9, SMS-10, SMS-11), SMS-12, SMS-14, SMS-15, SMS-18, SMS-19, SMS-20, SMS-21, SMS-22, SMS-26
+# :transport — the bridge seam (SMS-1, SMS-2, SMS-3, SMS-4, SMS-5, SMS-6, SMS-7, SMS-8, SMS-9, SMS-10, SMS-11), SMS-12, SMS-14, SMS-15, SMS-18, SMS-19, SMS-20, SMS-21, SMS-22, SMS-26, SMS-27
 
 Pure Kotlin/JVM module holding the InkStax SMS layer's one
 bridge seam. SMS-1 extracted the outbound side; SMS-2 adds the
@@ -638,3 +638,31 @@ delivers the previous pairing's senders and bodies to a new
 endpoint. SMS-25 wires no scheduled retry for a drain a
 failure blocks, and the pending outbound report queue acts
 on the drain's shape in later slices.
+
+## Upstream touchpoint registry (SMS-27, ≤5, tagged in code)
+
+None — zero upstream files are modified in this slice.
+Everything in this slice is one new file
+(PendingReportQueueStorage.kt in the app-side
+org.fossify.messages.transport package) plus this README.
+The storage persists the queue SMS-26 defines in the app
+shared preferences, in SMS-7's shape and SMS-23's shape: the
+whole queue is written in one checked synchronous commit
+(with the slots of a previously longer queue removed), and
+reads rebuild each entry as a verdict and fold it through
+the SMS-26 definitions, so a restored entry is pending only
+if it still qualifies and a restored queue never holds a
+source id twice. The nullable error code travels as a
+presence flag beside the value, and a presence flag true
+without its value rejects the entry instead of fabricating
+a code. A store reports success only after a verifying
+read-back. The queue is bound to the pairing that held it —
+its endpoint and device id are stored beside it in the same
+commit, and a queue reads back only under that pairing — so
+a disconnect and re-pair never reports the previous
+pairing's verdicts to a new endpoint. SMS-27 wires no
+caller and reports nothing — the drain caller that reports
+the head through SMS-21's binding, and the caller that holds
+a verdict on a send result, act on this storage in later
+slices.
+
