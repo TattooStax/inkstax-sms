@@ -373,3 +373,27 @@ app-side callers; a beat that finds no usable credential stops
 the service again. SMS-16 sends no stale-alert (brain-side) and
 no message ack, and nothing restarts the service after a reboot
 or a force-stop yet — those act on this caller in later slices.
+
+## Upstream touchpoint registry (SMS-17, ≤5, tagged in code)
+
+| # | File | Change |
+|---|------|--------|
+| 1 | `app/src/main/AndroidManifest.xml` | Registers `HeartbeatBootReceiver` for BOOT_COMPLETED — a reboot clears the heartbeat alarm and removes its persistent notification, so the schedule needs a boot entry point to restore itself |
+
+Everything else in this slice is one new file
+(`HeartbeatBootReceiver.kt` in the app-side
+`org.fossify.messages.transport` package) plus a small
+refactor of this track's own heartbeat files: the
+foreground-service start attempt the alarm receiver already
+made moves into a shared helper in `HeartbeatService.kt`, so
+the boot receiver and the alarm receiver hold the same
+refusal contract — a refused start selects the inline beat,
+never a lost beat. The boot receiver restores only a paired
+phone (a stored credential is the signal it was paired
+before the reboot): it reposts the persistent notification
+in its starting state, re-arms the interval alarm first, then
+beats at once through the one-beat service or inline when
+the start is refused. An unpaired phone restores nothing.
+A force-stopped app receives no boot broadcast, so the
+Settings-visit re-arm remains that case's recovery. SMS-17
+sends no stale-alert (brain-side) and no message ack.
