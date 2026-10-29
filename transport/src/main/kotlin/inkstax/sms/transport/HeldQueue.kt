@@ -15,12 +15,15 @@ package inkstax.sms.transport
  * functions.
  *
  * Only a message the shared disposition rule handles, carrying
- * a source id, may be held for delivery — the same two
- * conditions the delivery wire itself requires, applied here at
- * the point of holding so an MMS arrival (surfaced as not
- * forwarded in V1), a blank-sender arrival the caller still
- * owns, or an arrival with no provider identity never enters a
- * queue it could never drain from. The source id is the held
+ * a source id, may be held for delivery — the same conditions
+ * the delivery wire itself requires, applied here at the point
+ * of holding so an MMS arrival (surfaced as not forwarded in
+ * V1), a blank-sender arrival the caller still owns, an arrival
+ * with no provider identity, or an arrival whose receipt time
+ * is negative (a caller fault the delivery binding throws for,
+ * so the entry could never be acked and would block the head
+ * of the queue forever) never enters a queue it could never
+ * drain from. The source id is the held
  * message's identity: an arrival whose source id is already
  * held is the same message seen again, never a second entry,
  * because a duplicate entry would deliver a second copy against
@@ -49,10 +52,14 @@ data class HeldInboundMessage(
 
 /**
  * The held form of an inbound [message], or null when the
- * message may not be held for delivery: the shared disposition
- * rule does not handle it, or it carries no source id.
+ * message may not be held for delivery: its receipt time is
+ * negative, the shared disposition rule does not handle it, or
+ * it carries no source id.
  */
 fun heldInboundMessageFor(message: InboundSms): HeldInboundMessage? {
+    if (message.receivedAtMillis < 0L) {
+        return null
+    }
     if (inboundDispositionFor(message).disposition != InboundDisposition.HANDLED) {
         return null
     }

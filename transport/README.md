@@ -184,7 +184,8 @@ verdict is not a pairing fault. No caller reports a verdict yet
 a later slice. `HeldQueue.kt` (SMS-22) defines the held
 inbound message queue the delivery binding drains: a plain
 immutable list where only a message the shared disposition
-rule handles, carrying a source id, may be held; a re-seen
+rule handles, carrying a source id and a non-negative
+receipt time, may be held; a re-seen
 source id is the held message itself, never a second entry;
 the head is next in held order; and an entry leaves only when
 its delivery is acknowledged — removal is the release the

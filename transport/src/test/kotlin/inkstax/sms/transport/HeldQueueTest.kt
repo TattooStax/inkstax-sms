@@ -47,6 +47,19 @@ class HeldQueueTest {
     }
 
     @Test
+    fun `a negative receipt time is not held because it could never be delivered`() {
+        val negative = sms(11).copy(receivedAtMillis = -1L)
+        assertNull(heldInboundMessageFor(negative))
+        assertTrue(heldQueueAfterArrival(emptyList(), negative).isEmpty())
+    }
+
+    @Test
+    fun `a receipt time of zero is held`() {
+        val zero = sms(12).copy(receivedAtMillis = 0L)
+        assertEquals("sms:12", heldInboundMessageFor(zero)?.sourceId)
+    }
+
+    @Test
     fun `arrivals are held in arrival order and the head is next`() {
         var queue = heldQueueAfterArrival(emptyList(), sms(3))
         queue = heldQueueAfterArrival(queue, sms(1))
