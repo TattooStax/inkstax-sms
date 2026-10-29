@@ -8,7 +8,16 @@ import org.fossify.messages.models.Conversation
 class Config(context: Context) : BaseConfig(context) {
     companion object {
         fun newInstance(context: Context) = Config(context)
+
+        private const val ROLE_POSTURE_NAME = "role_posture_name"
     }
+
+    // SMS-3-TOUCHPOINT 1/3: the stored answer to the one posture setup
+    // question, kept as the :transport posture's name so this config
+    // stays free of seam types; RolePosture parsing lives in :transport.
+    var rolePostureName: String?
+        get() = prefs.getString(ROLE_POSTURE_NAME, null)
+        set(value) = prefs.edit().putString(ROLE_POSTURE_NAME, value).apply()
 
     fun saveUseSIMIdAtNumber(number: String, SIMId: Int) {
         prefs.edit().putInt(USE_SIM_ID_PREFIX + number, SIMId).apply()

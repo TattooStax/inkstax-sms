@@ -850,6 +850,13 @@ fun Context.insertNewSMS(
 
 fun Context.removeAllArchivedConversations(callback: (() -> Unit)? = null) {
     ensureBackgroundThread {
+        // Same default-role gate as deleteConversation below: without
+        // the role every delete in the loop would be refused, so do not
+        // report the archive as emptied.
+        if (Sms.getDefaultSmsPackage(this@removeAllArchivedConversations) != packageName) {
+            toast(R.string.delete_conversation_requires_default_messenger)
+            return@ensureBackgroundThread
+        }
         try {
             for (conversation in conversationsDB.getAllArchived()) {
                 deleteConversation(conversation.threadId)
@@ -863,6 +870,18 @@ fun Context.removeAllArchivedConversations(callback: (() -> Unit)? = null) {
 }
 
 fun Context.deleteConversation(threadId: Long) {
+    // SMS-3-TOUCHPOINT 5/5: only the default SMS app may write the
+    // telephony provider, so a conversation deleted without that role
+    // would only clear this app's cache and then be imported again on
+    // the next refresh. Refuse the deletion here, where every caller
+    // (conversation list, thread, archived, recycle bin) shares the
+    // path, and direct the user to the app that can actually delete it
+    // instead of presenting a cache-only removal as a deletion.
+    if (Sms.getDefaultSmsPackage(this) != packageName) {
+        toast(R.string.delete_conversation_requires_default_messenger)
+        return
+    }
+
     var uri = Sms.CONTENT_URI
     val selection = "${Sms.THREAD_ID} = ?"
     val selectionArgs = arrayOf(threadId.toString())

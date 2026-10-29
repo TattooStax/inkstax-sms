@@ -190,6 +190,24 @@
             </intent-filter>
         </receiver>
 
+        <!-- SMS-3-TOUCHPOINT 4/4: the permissions-only posture's inbound
+             copy; the receiver itself refuses to act in any other
+             posture or while this app holds the default role -->
+        <receiver
+            android:name=".receivers.SmsReceivedReceiver"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_SMS">
+            <intent-filter>
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Addressed only by the local binding's explicit sent-result
+             PendingIntents for that same posture -->
+        <receiver
+            android:name=".transport.PermissionsOnlySendResultReceiver"
+            android:exported="false" />
+
         <receiver
             android:name="com.android.mms.transaction.PushReceiver"
             android:exported="true"

@@ -1,4 +1,4 @@
-# :transport — the bridge seam (SMS-1, SMS-2)
+# :transport — the bridge seam (SMS-1, SMS-2, SMS-3)
 
 Pure Kotlin/JVM module holding the InkStax SMS layer's one
 bridge seam. SMS-1 extracted the outbound side; SMS-2 adds the
@@ -13,6 +13,13 @@ inbound side with its local binding first.
 - `outboundChannel` — the SMS-vs-MMS routing decision, extracted
   unchanged from the app's send entry point so local mode uses
   the same decision the seam exposes.
+- `RolePosture` + `rolePostureForDedicatedBusinessPhone` +
+  `rolePostureFromStoredName` — the role posture bound at setup by
+  device class (SMS-3): the one question "Is this phone dedicated
+  to the business line?" maps to DEFAULT_ROLE (dedicated) or
+  PERMISSIONS_ONLY (personal). UNSET is the fail-safe: no default
+  role may be requested until the question is answered, and an
+  unrecognised stored value reads back as UNSET.
 - `InboundSink` + `InboundSms` + `inboundDispositionFor` — the
   inbound side of the seam (SMS-2). The disposition rule is
   shared by every binding: SMS text is handled, MMS is
@@ -66,3 +73,31 @@ rule after local persistence).
 Everything else in these slices is new files (this module and
 the app-side `org.fossify.messages.transport` package) — no
 other upstream file is modified.
+
+## Upstream touchpoint registry (SMS-3, ≤5, tagged in code)
+
+| # | File | Change |
+|---|------|--------|
+| 1 | `app/src/main/kotlin/org/fossify/messages/helpers/Config.kt` | Stores the posture answer as the posture name string (`rolePostureName`) |
+| 2 | `app/src/main/kotlin/org/fossify/messages/activities/MainActivity.kt` | Startup runs the one posture question (via `ensureRolePosture` in the app-side transport package) before the message flow; `loadMessages` requests the default SMS role only when the posture allows it and otherwise goes straight to runtime permissions |
+| 3 | `app/src/main/res/values/strings.xml` | The posture question string and its two answer strings |
+| 4 | `app/src/main/AndroidManifest.xml` | Registers `SmsReceivedReceiver` for SMS_RECEIVED, the permissions-only posture's inbound copy |
+| 5 | `app/src/main/kotlin/org/fossify/messages/extensions/Context.kt` | `deleteConversation` refuses when this app does not hold the default SMS role and directs the user to their default messenger - only the default app may write the provider, so the deletion would otherwise clear only this app's cache and the conversation would be imported again |
+
+SMS-3 note: the dedicated posture keeps the upstream startup flow
+unchanged (default role requested, declining it exits). The
+personal posture is new behaviour end to end, because a non-default
+app lives under different platform rules: the default-role request
+is skipped entirely so the owner's own messenger stays default;
+inbound arrives through a new SMS_RECEIVED receiver that hands a
+copy to the seam and writes nothing (the default app owns the
+provider row and the notification); outbound sends through
+SmsManager directly from the local binding, because the existing
+send path persists to the provider before sending and that write
+is denied to non-default apps. The posture answer is per-device
+consent: it is stored with a token in no-backup storage, so an
+answer restored from backup onto another phone reads back as
+UNSET and the question is asked again there. Subscription pinning
+for the personal posture is policy in `:transport`
+(`requiresPinnedSubscription`); its enforcement at send selection
+is a later slice, not claimed here.
