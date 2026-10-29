@@ -1,4 +1,4 @@
-# :transport — the bridge seam (SMS-1, SMS-2, SMS-3, SMS-4, SMS-5, SMS-6, SMS-7, SMS-8, SMS-9, SMS-10, SMS-11), SMS-12, SMS-14
+# :transport — the bridge seam (SMS-1, SMS-2, SMS-3, SMS-4, SMS-5, SMS-6, SMS-7, SMS-8, SMS-9, SMS-10, SMS-11), SMS-12, SMS-14, SMS-15
 
 Pure Kotlin/JVM module holding the InkStax SMS layer's one
 bridge seam. SMS-1 extracted the outbound side; SMS-2 adds the
@@ -103,7 +103,9 @@ inbound side with its local binding first.
   still holds definitions only, and no endpoint or credential
   material lives here. SMS-4 defines the ack/heartbeat *states*
   every binding shares, and SMS-14 defines the heartbeat's wire
-  shape, but no binding sends a heartbeat or an ack yet. SMS-5 defines the pairing payload and token *states*,
+  shape; the heartbeat binding now performs that beat app-side
+  (SMS-15), but no timer or scheduler calls it yet and no
+  message ack travels yet. SMS-5 defines the pairing payload and token *states*,
   and the scanner that reads a QR lives app-side (SMS-10).
   The local binding is
   in-process; host/cloud bindings stay design-intent until their
@@ -123,7 +125,15 @@ persistence/sending code, error codes unchanged) and
 `LocalInboundSink` (inbound, applies the shared disposition
 rule after local persistence). `PairingExchangeBinding.kt`
 performs the pairing exchange over HTTPS and stores the minted
-credential through `CredentialStorage.kt`. `PairingSetup.kt`
+credential through `CredentialStorage.kt`. `HeartbeatBinding.kt`
+(SMS-15) performs the heartbeat SMS-14 defines: it beats with
+the stored credential, reads the answer by status alone (the
+ack carries no body, so none is read), and keeps the
+no-usable-credential outcome distinct from an unreachable
+endpoint, because a broken pairing must not read as a link
+that merely went quiet. No caller beats on a schedule yet —
+the timer, scheduler, and foreground notification are later
+slices. `PairingSetup.kt`
 (SMS-10) is the exchange binding's caller: an embedded ZXing
 scanner (Apache-2.0, no GMS) launched from Settings reads a QR,
 only a payload `pairingOfferFromQrPayload` accepts starts an
@@ -258,7 +268,7 @@ process-wide guard.
 The library's own manifest supplies the camera permission and
 its capture activity, so this slice adds no manifest entry.
 Still not claimed: the download/App-Link serving of the QR is
-brain-side work, and no binding sends a heartbeat or an ack yet.
+brain-side work, and no binding sends a message ack yet.
 
 ## Upstream touchpoint registry (SMS-11, ≤5, tagged in code)
 
@@ -304,6 +314,20 @@ judges the answer the one way. SMS-14 runs no network call,
 starts no timer, and sends no ack — the binding, its schedule,
 and the foreground notification act on these definitions in
 later slices.
+
+## Upstream touchpoint registry (SMS-15, ≤5, tagged in code)
+
+None — zero upstream files are modified in this slice.
+Everything in this slice is one new file
+(`HeartbeatBinding.kt` in the app-side
+`org.fossify.messages.transport` package) plus this README.
+The binding performs the heartbeat SMS-14 defines with the
+credential SMS-7 stores: a credential the seam does not accept
+for its own endpoint beats nothing at all and reports its own
+outcome, distinct from every wire failure. SMS-15 starts no
+timer or scheduler, wires no foreground notification, and
+sends no message ack — a scheduled caller acts on this binding
+in a later slice.
 
 SMS-3 note: the dedicated posture keeps the upstream startup flow
 unchanged (default role requested, declining it exits). The
