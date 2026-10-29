@@ -1,4 +1,4 @@
-# :transport — the bridge seam (SMS-1, SMS-2, SMS-3, SMS-4, SMS-5, SMS-6, SMS-7, SMS-8, SMS-9, SMS-10, SMS-11), SMS-12, SMS-14, SMS-15, SMS-18, SMS-19, SMS-20, SMS-21
+# :transport — the bridge seam (SMS-1, SMS-2, SMS-3, SMS-4, SMS-5, SMS-6, SMS-7, SMS-8, SMS-9, SMS-10, SMS-11), SMS-12, SMS-14, SMS-15, SMS-18, SMS-19, SMS-20, SMS-21, SMS-22
 
 Pure Kotlin/JVM module holding the InkStax SMS layer's one
 bridge seam. SMS-1 extracted the outbound side; SMS-2 adds the
@@ -181,7 +181,19 @@ distinct from every wire outcome, because a broken pairing must
 not read as a link that merely went quiet and an unreportable
 verdict is not a pairing fault. No caller reports a verdict yet
 — the send-result caller that hands verdicts to this binding is
-a later slice. `HeartbeatBinding.kt`
+a later slice. `HeldQueue.kt` (SMS-22) defines the held
+inbound message queue the delivery binding drains: a plain
+immutable list where only a message the shared disposition
+rule handles, carrying a source id, may be held; a re-seen
+source id is the held message itself, never a second entry;
+the head is next in held order; and an entry leaves only when
+its delivery is acknowledged — removal is the release the
+dual-ack transition defines, and every failed outcome leaves
+the entry in place for a redelivery against the same source
+id. Pure definitions only: no storage, no caller, and no
+drain loop lives here — the app-side queue storage and the
+caller that delivers on arrival act on these definitions in
+later slices. `HeartbeatBinding.kt`
 (SMS-15) performs the heartbeat SMS-14 defines: it beats with
 the stored credential, reads the answer by status alone (the
 ack carries no body, so none is read), and keeps the
@@ -517,3 +529,14 @@ fault is a link that merely went quiet. SMS-21 wires no
 caller — the send-result caller that hands verdicts to this
 binding, and the held-message queue, act on it in later
 slices.
+
+## Upstream touchpoint registry (SMS-22, ≤5, tagged in code)
+
+None — zero upstream files are modified in this slice.
+Everything in this slice is two new files in `:transport`
+(`HeldQueue.kt` and its test) plus this README. The
+definitions hold no queue themselves: no storage is written,
+no caller delivers on arrival yet, and no outbound verdict
+queue is defined — the app-side storage of this queue, the
+drain caller, and the pending outbound report queue act on
+these definitions in later slices.
