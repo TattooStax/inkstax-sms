@@ -74,16 +74,29 @@ fun Context.holdAndDrainOutboundVerdict(
             if (storedDeviceCredential() == null) {
                 false
             } else {
-                storePendingOutboundReportQueue(
+                val before = storedPendingOutboundReportQueue()
+                val stored = storePendingOutboundReportQueue(
                     pendingReportQueueAfterVerdict(
-                        storedPendingOutboundReportQueue(),
+                        before,
                         pending.sourceId,
                         pending.event,
                         pending.errorCode,
                         pending.reportedAtMillis
                     )
                 )
-                storedPendingOutboundReportQueue().any { it.sourceId == pending.sourceId }
+                if (stored) {
+                    storedPendingOutboundReportQueue().any { it.sourceId == pending.sourceId }
+                } else {
+                    // A failed commit can still leave the in-memory
+                    // preferences holding the new queue, so the
+                    // pre-hold queue is written back before the
+                    // verdict is reported unheld: a later caller in
+                    // this process must not find pending a verdict
+                    // that was never durably held, and must not
+                    // enqueue a drain for it.
+                    storePendingOutboundReportQueue(before)
+                    false
+                }
             }
         }
     }
