@@ -1,4 +1,4 @@
-# :transport — the bridge seam (SMS-1, SMS-2, SMS-3, SMS-4, SMS-5, SMS-6, SMS-7, SMS-8, SMS-9, SMS-10, SMS-11), SMS-12, SMS-14, SMS-15
+# :transport — the bridge seam (SMS-1, SMS-2, SMS-3, SMS-4, SMS-5, SMS-6, SMS-7, SMS-8, SMS-9, SMS-10, SMS-11), SMS-12, SMS-14, SMS-15, SMS-18
 
 Pure Kotlin/JVM module holding the InkStax SMS layer's one
 bridge seam. SMS-1 extracted the outbound side; SMS-2 adds the
@@ -84,6 +84,21 @@ inbound side with its local binding first.
   accept for its own endpoint builds no request at all. Pure
   definitions only: no binding performs the POST yet, and no
   timer or scheduler lives here.
+- `MessageDeliveryWire.kt` — the inbound delivery wire
+  definitions (SMS-18): the one request shape every binding
+  uses to hand an inbound message to the brain (the message
+  under its `sourceId`, its sender, body, receipt time, and
+  the received-late verdict, as a flat JSON string object,
+  POSTed to `/companion/inbound` on the stored credential's
+  endpoint, the secret carried only in the authorization
+  value, in its base64url-encoded spelling, never in the body)
+  and the one reading of the answer (only No Content is the
+  brain's ack, releasing the held message through the dual-ack
+  transition; a credential refusal is its own failure, distinct
+  from an unreachable endpoint). Only a message the shared
+  disposition rule handles, carrying a source id, builds a
+  request at all. Pure definitions only: no binding performs
+  the POST yet, and no outbound ack wire is defined yet.
 - `InboundSink` + `InboundSms` + `inboundDispositionFor` — the
   inbound side of the seam (SMS-2). The disposition rule is
   shared by every binding: SMS text is handled, MMS is
@@ -401,3 +416,16 @@ is refused. An unpaired phone restores nothing.
 A force-stopped app receives no boot broadcast, so the
 Settings-visit re-arm remains that case's recovery. SMS-17
 sends no stale-alert (brain-side) and no message ack.
+
+## Upstream touchpoint registry (SMS-18, ≤5, tagged in code)
+
+None — zero upstream files are modified in this slice. The
+whole slice is new files inside `:transport`
+(`MessageDeliveryWire.kt` and its test) plus this README: it
+defines the inbound delivery request shape and the reading of
+its answer (status only — the brain ack carries no body), so
+a binding that performs the delivery in a later slice sends
+the one shape and judges the answer the one way. SMS-18 runs
+no network call and holds no queue — the binding, the
+held-message queue it drains, and the outbound ack wire act
+on these definitions in later slices.
