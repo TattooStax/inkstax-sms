@@ -16,6 +16,7 @@ import org.fossify.messages.helpers.ReceiverUtils.isMessageFilteredOut
 import org.fossify.messages.helpers.refreshConversations
 import org.fossify.messages.helpers.refreshMessages
 import org.fossify.messages.transport.LocalInboundSink
+import org.fossify.messages.transport.holdAndDrainInboundArrival
 import org.fossify.messages.transport.storedRolePosture
 
 /**
@@ -63,14 +64,18 @@ class SmsReceivedReceiver : BroadcastReceiver() {
                     if (result == ContactLookupResult.NotFound) return@ensureBackgroundThread
                 }
 
-                LocalInboundSink().onInbound(
-                    InboundSms(
-                        sender = address,
-                        body = body,
-                        receivedAtMillis = parts.last().timestampMillis,
-                        subscriptionId = intent.getIntExtra("subscription", -1)
-                    )
+                val inbound = InboundSms(
+                    sender = address,
+                    body = body,
+                    receivedAtMillis = parts.last().timestampMillis,
+                    subscriptionId = intent.getIntExtra("subscription", -1)
                 )
+                LocalInboundSink().onInbound(inbound)
+                // SMS-25-TOUCHPOINT 2/4: the arrival caller runs on this receiver's
+                // background thread too. This path writes no provider row, so its
+                // arrivals carry no source id and the caller holds none of them —
+                // a held delivery needs an identity the brain can ack against.
+                appContext.holdAndDrainInboundArrival(inbound)
 
                 // Open screens reload from the provider on these events,
                 // as they do for the default intake. The reload races the

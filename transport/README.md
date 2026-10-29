@@ -579,3 +579,46 @@ source id. SMS-24 wires no trigger of its own — the arrival
 caller that holds a message on arrival, any scheduled retry
 of a blocked drain, and the pending outbound report queue act
 on this caller in later slices.
+
+## Upstream touchpoint registry (SMS-25, ≤5, tagged in code)
+
+Four tagged touchpoints: (1) `SmsReceiver` (the default-role
+intake), (2) `SmsReceivedReceiver` (the permissions-only
+intake), (3) `MmsReceiver` — the three receivers' existing seam
+call sites, extended — and (4) the WorkManager dependency in
+`app/build.gradle.kts` (`androidx.work:work-runtime:2.10.5`,
+Apache-2.0, no GMS — the local build's GMS-free invariant
+holds). Everything else is in this track's own files: three
+new files (`HeldArrival.kt`, `HeldDrainWorker.kt`, and
+`HeldQueueGuard.kt` in the app-side
+`org.fossify.messages.transport` package), the held-queue
+storage and drain files extended, plus this README. Each
+receiver builds its inbound message once, passes it through
+the local binding as before, and then calls the arrival
+caller. The caller holds the arrival through the stored
+queue SMS-23 persists and enqueues the queue drain SMS-24
+performs as lifecycle-managed work (unique, appended,
+network-constrained), so delivery to the brain is attempted
+on arrival without the drain ever running inside a
+broadcast's execution window: the receiver's thread does only
+the local hold, and the worker drains outside the broadcast's
+lifetime. Only an arrival the shared holding rule holds is
+attempted — an MMS arrival stays not forwarded and unheld, a
+blank-sender arrival stays unheld, and an arrival with no
+source id (the permissions-only path writes no provider row,
+so its arrivals carry none) is never held — and only a paired
+phone attempts the hold at all: with no usable credential an
+unpaired or local-mode phone behaves exactly as before,
+holding nothing and delivering nothing. Every
+read-modify-write of the stored queue — an arrival's hold and
+a drain's release alike — runs under one process-wide guard,
+with a drain's network call outside it, so a hold landing
+while a delivery is in flight is neither lost under that
+delivery's release nor overtaken. The stored queue is bound
+to the pairing that held it — its endpoint and device id are
+stored beside it in the same commit, and a queue reads back
+only under that pairing — so a disconnect and re-pair never
+delivers the previous pairing's senders and bodies to a new
+endpoint. SMS-25 wires no scheduled retry for a drain a
+failure blocks, and the pending outbound report queue acts
+on the drain's shape in later slices.
