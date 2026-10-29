@@ -13,7 +13,7 @@ class OutboundAckWireTest {
 
     @Test
     fun `a sent report posts the verdict to the outbound ack path on the credential endpoint`() {
-        val request = outboundAckRequestFor(credential, "sms:41", TransportOutcome.Sent, reportedAt)
+        val request = outboundAckRequestFor(credential, "sms:41", OutboundAckEvent.PHONE_ACKED_SENT, null, reportedAt)
         assertEquals("https://brain.example/companion/outbound-ack", request?.url)
         assertEquals(
             """{"device_id":"device-1","source_id":"sms:41","outcome":"sent","reported_at_millis":"1700000060000"}""",
@@ -22,23 +22,45 @@ class OutboundAckWireTest {
     }
 
     @Test
-    fun `a failed report carries the sending error code and no free text detail`() {
+    fun `a failed report carries the sending error code`() {
         val request = outboundAckRequestFor(
             credential,
             "sms:41",
-            TransportOutcome.Failed(TransportOutcome.ERROR_SENDING_MESSAGE, "radio exploded"),
+            OutboundAckEvent.PHONE_REPORTED_FAILURE,
+            TransportOutcome.ERROR_SENDING_MESSAGE,
             reportedAt
         )
         assertEquals(
             """{"device_id":"device-1","source_id":"sms:41","outcome":"failed","error_code":"-3","reported_at_millis":"1700000060000"}""",
             request?.body
         )
-        assertFalse(request!!.body.contains("radio exploded"))
+    }
+
+    @Test
+    fun `an error code that contradicts the verdict builds no report`() {
+        assertNull(
+            outboundAckRequestFor(credential, "sms:41", OutboundAckEvent.PHONE_ACKED_SENT, TransportOutcome.ERROR_SENDING_MESSAGE, reportedAt)
+        )
+        assertNull(
+            outboundAckRequestFor(credential, "sms:41", OutboundAckEvent.PHONE_REPORTED_FAILURE, null, reportedAt)
+        )
+    }
+
+    @Test
+    fun `a failure with only the unknown error code still reports`() {
+        val request = outboundAckRequestFor(
+            credential,
+            "sms:41",
+            OutboundAckEvent.PHONE_REPORTED_FAILURE,
+            TransportOutcome.UNKNOWN_ERROR,
+            reportedAt
+        )
+        assertTrue(request!!.body.contains("\"error_code\":\"0\""))
     }
 
     @Test
     fun `the secret travels only in the authorization value never in the body`() {
-        val request = outboundAckRequestFor(credential, "sms:41", TransportOutcome.Sent, reportedAt)
+        val request = outboundAckRequestFor(credential, "sms:41", OutboundAckEvent.PHONE_ACKED_SENT, null, reportedAt)
         assertFalse(request!!.body.contains("secret-abc"))
         assertFalse(request.url.contains("secret-abc"))
         assertFalse(request.authorization.contains("secret-abc"))
@@ -47,10 +69,10 @@ class OutboundAckWireTest {
     @Test
     fun `any minted secret encodes to a valid authorization value that decodes back to itself`() {
         val quoted = DeviceCredential("https://brain.example", "device-1", "sec\"ret-Abc")
-        val quotedAuth = outboundAckRequestFor(quoted, "sms:41", TransportOutcome.Sent, reportedAt)?.authorization
+        val quotedAuth = outboundAckRequestFor(quoted, "sms:41", OutboundAckEvent.PHONE_ACKED_SENT, null, reportedAt)?.authorization
         assertTrue(quotedAuth != null)
         val control = DeviceCredential("https://brain.example", "device-1", "a\u0001secret")
-        val authorization = outboundAckRequestFor(control, "sms:41", TransportOutcome.Sent, reportedAt)?.authorization
+        val authorization = outboundAckRequestFor(control, "sms:41", OutboundAckEvent.PHONE_ACKED_SENT, null, reportedAt)?.authorization
         val decoded = java.util.Base64.getUrlDecoder().decode(authorization!!.removePrefix("Bearer "))
         assertEquals("a\u0001secret", String(decoded, Charsets.UTF_8))
     }
@@ -60,13 +82,13 @@ class OutboundAckWireTest {
         val slashed = DeviceCredential("https://brain.example/", "device-1", "secret-abc")
         assertEquals(
             "https://brain.example/companion/outbound-ack",
-            outboundAckRequestFor(slashed, "sms:41", TransportOutcome.Sent, reportedAt)?.url
+            outboundAckRequestFor(slashed, "sms:41", OutboundAckEvent.PHONE_ACKED_SENT, null, reportedAt)?.url
         )
     }
 
     @Test
     fun `the request rendering never shows the secret raw or encoded`() {
-        val rendered = outboundAckRequestFor(credential, "sms:41", TransportOutcome.Sent, reportedAt).toString()
+        val rendered = outboundAckRequestFor(credential, "sms:41", OutboundAckEvent.PHONE_ACKED_SENT, null, reportedAt).toString()
         assertFalse(rendered.contains("secret-abc"))
         assertFalse(rendered.contains("c2VjcmV0LWFiYw"))
         assertTrue(rendered.contains("<redacted>"))
@@ -74,7 +96,7 @@ class OutboundAckWireTest {
 
     @Test
     fun `the request body escapes the source id exactly`() {
-        val request = outboundAckRequestFor(credential, "sms:\"41\"", TransportOutcome.Sent, reportedAt)
+        val request = outboundAckRequestFor(credential, "sms:\"41\"", OutboundAckEvent.PHONE_ACKED_SENT, null, reportedAt)
         assertEquals(
             """{"device_id":"device-1","source_id":"sms:\"41\"","outcome":"sent","reported_at_millis":"1700000060000"}""",
             request?.body
@@ -83,25 +105,25 @@ class OutboundAckWireTest {
 
     @Test
     fun `a credential the seam does not accept builds no report`() {
-        assertNull(outboundAckRequestFor(DeviceCredential("http://brain.example", "device-1", "secret-abc"), "sms:41", TransportOutcome.Sent, reportedAt))
-        assertNull(outboundAckRequestFor(DeviceCredential("https://brain.example/path", "device-1", "secret-abc"), "sms:41", TransportOutcome.Sent, reportedAt))
-        assertNull(outboundAckRequestFor(DeviceCredential("https://brain.example", "", "secret-abc"), "sms:41", TransportOutcome.Sent, reportedAt))
-        assertNull(outboundAckRequestFor(DeviceCredential("https://brain.example", "device-1", ""), "sms:41", TransportOutcome.Sent, reportedAt))
-        assertNull(outboundAckRequestFor(DeviceCredential("https://brain.example", "device-1", " secret-abc "), "sms:41", TransportOutcome.Sent, reportedAt))
+        assertNull(outboundAckRequestFor(DeviceCredential("http://brain.example", "device-1", "secret-abc"), "sms:41", OutboundAckEvent.PHONE_ACKED_SENT, null, reportedAt))
+        assertNull(outboundAckRequestFor(DeviceCredential("https://brain.example/path", "device-1", "secret-abc"), "sms:41", OutboundAckEvent.PHONE_ACKED_SENT, null, reportedAt))
+        assertNull(outboundAckRequestFor(DeviceCredential("https://brain.example", "", "secret-abc"), "sms:41", OutboundAckEvent.PHONE_ACKED_SENT, null, reportedAt))
+        assertNull(outboundAckRequestFor(DeviceCredential("https://brain.example", "device-1", ""), "sms:41", OutboundAckEvent.PHONE_ACKED_SENT, null, reportedAt))
+        assertNull(outboundAckRequestFor(DeviceCredential("https://brain.example", "device-1", " secret-abc "), "sms:41", OutboundAckEvent.PHONE_ACKED_SENT, null, reportedAt))
     }
 
     @Test
     fun `an identity that is blank or carries whitespace builds no report`() {
-        assertNull(outboundAckRequestFor(credential, "", TransportOutcome.Sent, reportedAt))
-        assertNull(outboundAckRequestFor(credential, "  ", TransportOutcome.Sent, reportedAt))
-        assertNull(outboundAckRequestFor(credential, "sms: 41", TransportOutcome.Sent, reportedAt))
-        assertNull(outboundAckRequestFor(credential, " sms:41", TransportOutcome.Sent, reportedAt))
+        assertNull(outboundAckRequestFor(credential, "", OutboundAckEvent.PHONE_ACKED_SENT, null, reportedAt))
+        assertNull(outboundAckRequestFor(credential, "  ", OutboundAckEvent.PHONE_ACKED_SENT, null, reportedAt))
+        assertNull(outboundAckRequestFor(credential, "sms: 41", OutboundAckEvent.PHONE_ACKED_SENT, null, reportedAt))
+        assertNull(outboundAckRequestFor(credential, " sms:41", OutboundAckEvent.PHONE_ACKED_SENT, null, reportedAt))
     }
 
     @Test
     fun `a negative report time builds no report and zero is a timestamp`() {
-        assertNull(outboundAckRequestFor(credential, "sms:41", TransportOutcome.Sent, -1L))
-        assertTrue(outboundAckRequestFor(credential, "sms:41", TransportOutcome.Sent, 0L) != null)
+        assertNull(outboundAckRequestFor(credential, "sms:41", OutboundAckEvent.PHONE_ACKED_SENT, null, -1L))
+        assertTrue(outboundAckRequestFor(credential, "sms:41", OutboundAckEvent.PHONE_ACKED_SENT, null, 0L) != null)
     }
 
     @Test
@@ -143,11 +165,11 @@ class OutboundAckWireTest {
     fun `the phone verdict moves a queued reply to its terminal state`() {
         assertEquals(
             OutboundAckState.SENT,
-            outboundAckStateAfterSend(OutboundAckState.QUEUED, TransportOutcome.Sent)
+            outboundAckStateAfterSend(OutboundAckState.QUEUED, OutboundAckEvent.PHONE_ACKED_SENT)
         )
         assertEquals(
             OutboundAckState.FAILED,
-            outboundAckStateAfterSend(OutboundAckState.QUEUED, TransportOutcome.Failed(TransportOutcome.ERROR_SENDING_MESSAGE))
+            outboundAckStateAfterSend(OutboundAckState.QUEUED, OutboundAckEvent.PHONE_REPORTED_FAILURE)
         )
     }
 
@@ -155,11 +177,11 @@ class OutboundAckWireTest {
     fun `a terminal state ignores a late or duplicate verdict`() {
         assertEquals(
             OutboundAckState.SENT,
-            outboundAckStateAfterSend(OutboundAckState.SENT, TransportOutcome.Failed(TransportOutcome.ERROR_SENDING_MESSAGE))
+            outboundAckStateAfterSend(OutboundAckState.SENT, OutboundAckEvent.PHONE_REPORTED_FAILURE)
         )
         assertEquals(
             OutboundAckState.FAILED,
-            outboundAckStateAfterSend(OutboundAckState.FAILED, TransportOutcome.Sent)
+            outboundAckStateAfterSend(OutboundAckState.FAILED, OutboundAckEvent.PHONE_ACKED_SENT)
         )
     }
 }

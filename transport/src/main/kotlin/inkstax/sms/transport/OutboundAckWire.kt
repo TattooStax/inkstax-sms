@@ -10,9 +10,20 @@ package inkstax.sms.transport
  * the report a binding sends and the reading of the answer it
  * gets back cannot drift between bindings. There is no network
  * call here — a binding supplies the stored credential, the
- * identity of the reply it sent, and the send outcome its
- * transport returned, performs the HTTPS POST, and acts on the
- * outcome.
+ * identity of the reply it sent, and the phone's ack event for
+ * that send, performs the HTTPS POST, and acts on the outcome.
+ *
+ * The report is built from the ack event, never from the
+ * transport's submission outcome: a send call returning means
+ * the message was queued with the radio, not that it sent —
+ * the local binding's own contract says radio and carrier
+ * failures arrive asynchronously, after the call has returned.
+ * A report built from the submission would call a queued reply
+ * sent and, the state being terminal, would bury the failure
+ * that arrived later. The ack event is the phone's actual
+ * verdict, which the binding's send-result path already
+ * receives; that verdict, and only it, is what this wire
+ * carries.
  *
  * The report is a POST to the outbound ack path on the
  * credential's own endpoint, authenticated by the credential
@@ -108,19 +119,24 @@ data class OutboundAckRequest(
 
 /**
  * The ack report for a reply filed under [sourceId] whose send
- * ended in [sendOutcome], reported at [reportedAtMillis] under
- * a stored [credential] — or null when no report may be sent:
- * the report time is negative, the credential is not one the
- * seam accepts for its own endpoint, or the source id is blank
- * or carries whitespace. Building no report is the honest
+ * the phone acked with [event], reported at [reportedAtMillis]
+ * under a stored [credential] — or null when no report may be
+ * sent: the report time is negative, the credential is not one
+ * the seam accepts for its own endpoint, the source id is blank
+ * or carries whitespace, or the error code contradicts the
+ * event (a sent verdict carries none; a failure verdict carries
+ * the code the send failed with, the unknown code included, so
+ * a failure is never filed as if it had a more precise cause
+ * than the phone reported). Building no report is the honest
  * outcome for each of those — the caller keeps the verdict
  * unreported rather than filing it against an identity the
- * brain cannot match.
+ * brain cannot match, or with a shape that contradicts itself.
  */
 fun outboundAckRequestFor(
     credential: DeviceCredential,
     sourceId: String,
-    sendOutcome: TransportOutcome,
+    event: OutboundAckEvent,
+    errorCode: Int?,
     reportedAtMillis: Long
 ): OutboundAckRequest? {
     if (reportedAtMillis < 0L) {
@@ -134,14 +150,20 @@ fun outboundAckRequestFor(
     }
     val outcomeValue: String
     val errorCodeField: String
-    when (sendOutcome) {
-        is TransportOutcome.Sent -> {
+    when (event) {
+        OutboundAckEvent.PHONE_ACKED_SENT -> {
+            if (errorCode != null) {
+                return null
+            }
             outcomeValue = OUTBOUND_ACK_OUTCOME_SENT
             errorCodeField = ""
         }
-        is TransportOutcome.Failed -> {
+        OutboundAckEvent.PHONE_REPORTED_FAILURE -> {
+            if (errorCode == null) {
+                return null
+            }
             outcomeValue = OUTBOUND_ACK_OUTCOME_FAILED
-            errorCodeField = ",\"$OUTBOUND_ACK_ERROR_CODE_FIELD\":${jsonString(sendOutcome.errorCode.toString())}"
+            errorCodeField = ",\"$OUTBOUND_ACK_ERROR_CODE_FIELD\":${jsonString(errorCode.toString())}"
         }
     }
     return OutboundAckRequest(
@@ -221,20 +243,16 @@ fun outboundAckOutcomeFor(statusCode: Int?): OutboundAckOutcome {
 }
 
 /**
- * The outbound ack state after a send ended in [sendOutcome]:
- * the phone's own verdict moves the state, through the one
- * transition [outboundAckStateAfter] defines, so a queued reply
- * is shown sent or failed exactly when the phone knows, and a
- * terminal state ignores a late or duplicate verdict. Whether
- * the report of that verdict reached the brain is a separate
- * fact, read through [outboundAckOutcomeFor] — it never moves
- * this state.
+ * The outbound ack state after the phone acked a send with
+ * [event]: the phone's own verdict moves the state, through the
+ * one transition [outboundAckStateAfter] defines, so a queued
+ * reply is shown sent or failed exactly when the phone knows,
+ * and a terminal state ignores a late or duplicate verdict.
+ * Whether the report of that verdict reached the brain is a
+ * separate fact, read through [outboundAckOutcomeFor] — it
+ * never moves this state.
  */
-fun outboundAckStateAfterSend(current: OutboundAckState, sendOutcome: TransportOutcome): OutboundAckState {
-    val event = when (sendOutcome) {
-        is TransportOutcome.Sent -> OutboundAckEvent.PHONE_ACKED_SENT
-        is TransportOutcome.Failed -> OutboundAckEvent.PHONE_REPORTED_FAILURE
-    }
+fun outboundAckStateAfterSend(current: OutboundAckState, event: OutboundAckEvent): OutboundAckState {
     return outboundAckStateAfter(current, event)
 }
 

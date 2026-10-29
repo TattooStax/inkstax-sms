@@ -111,7 +111,11 @@ inbound side with its local binding first.
   the report; a credential refusal is its own failure, distinct
   from an unreachable endpoint). The body carries no message
   content — the brain already holds the reply it dispatched.
-  The phone's send outcome, not the brain's answer, moves the
+  The report is built from the phone's ack event, never from
+  the transport's submission outcome: a returned send call
+  means the message was queued, and the verdict arrives
+  asynchronously after it. The phone's send outcome, not the
+  brain's answer, moves the
   ack state, through SMS-4's transition; a failure's free-text
   detail stays on the phone. A credential the seam does not
   accept for its own endpoint, and an identity that is blank or
