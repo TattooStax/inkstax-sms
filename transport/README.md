@@ -1,4 +1,4 @@
-# :transport — the bridge seam (SMS-1, SMS-2, SMS-3, SMS-4, SMS-5, SMS-6, SMS-7, SMS-8, SMS-9, SMS-10, SMS-11), SMS-12, SMS-14, SMS-15, SMS-18, SMS-19, SMS-20, SMS-21, SMS-22, SMS-26, SMS-27, SMS-28
+# :transport — the bridge seam (SMS-1, SMS-2, SMS-3, SMS-4, SMS-5, SMS-6, SMS-7, SMS-8, SMS-9, SMS-10, SMS-11), SMS-12, SMS-14, SMS-15, SMS-18, SMS-19, SMS-20, SMS-21, SMS-22, SMS-26, SMS-27, SMS-28, SMS-29
 
 Pure Kotlin/JVM module holding the InkStax SMS layer's one
 bridge seam. SMS-1 extracted the outbound side; SMS-2 adds the
@@ -706,3 +706,33 @@ in flight is neither lost under that report's release nor
 overtaken. SMS-28 wires no trigger of its own — the caller
 that holds a verdict on a send result, and any scheduled
 retry of a blocked drain, act on this caller in later slices.
+
+## Upstream touchpoint registry (SMS-29, ≤5, tagged in code)
+
+None — zero upstream files are modified in this slice.
+Everything in this slice is two new files
+(PendingReportVerdict.kt and PendingReportDrainWorker.kt in
+the app-side org.fossify.messages.transport package), a
+doc-only change to this track's own CredentialGuard.kt, plus
+this README.
+The verdict caller holds the phone's verdict on a send — the
+ack event a send-result path receives, never the transport's
+submission outcome — through the stored pending report queue
+SMS-27 persists, and enqueues the drain SMS-28 built as
+unique, appended, network-constrained lifecycle-managed work,
+so reporting is attempted when the verdict is reached and a
+drain never runs inside a send-result receiver's execution
+window. Only a verdict the SMS-26 holding rule accepts is
+held, and only on a paired phone: an unpaired or local-mode
+phone holds nothing and reports nothing. The hold runs under
+the credential guard, outside the queue guard and in the one
+lock order the drain's release uses, because storing the
+queue stamps it with the pairing that held it — the
+credential check and the store are atomic against a
+disconnect and re-pair, so one pairing's verdict is never
+stamped with the next pairing's identity. SMS-29 wires no
+send-result receiver yet: no send path in the fork carries a
+bridge source id for a reply today, and choosing an identity
+for local sends is the brain-dispatched send path's own
+slice. A scheduled retry of a blocked drain remains a later
+caller slice.
