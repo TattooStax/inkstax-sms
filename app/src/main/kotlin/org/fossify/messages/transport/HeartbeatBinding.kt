@@ -39,6 +39,10 @@ sealed interface HeartbeatBindingResult {
  * over TLS, and only in the authorization value the wire shape
  * defines — never in the body, never logged here.
  *
+ * A negative [sentAtMillis] is a caller error and throws: an
+ * argument fault must never be reported as a missing or broken
+ * credential, whose documented recovery is re-pairing.
+ *
  * This call blocks on the network, so it belongs on a background
  * thread. A transport fault while asking reads as no answer at
  * all, which the outcome reader names unreachable. Redirects are
@@ -51,6 +55,7 @@ sealed interface HeartbeatBindingResult {
  */
 @Suppress("SwallowedException")
 fun Context.performHeartbeat(sentAtMillis: Long): HeartbeatBindingResult {
+    require(sentAtMillis >= 0L) { "sentAtMillis must not be negative" }
     val credential = storedDeviceCredential()
         ?: return HeartbeatBindingResult.NoUsableCredential
     val request = heartbeatRequestFor(credential, sentAtMillis)
