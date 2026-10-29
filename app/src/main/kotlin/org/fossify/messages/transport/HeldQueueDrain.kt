@@ -52,6 +52,15 @@ fun Context.drainHeldInboundQueue(handedOffAtMillis: Long): HeldQueueDrainResult
         }
         val remaining = heldQueueAfterDelivery(queue, head.sourceId, outcome)
         if (!storeHeldInboundQueue(remaining)) {
+            // A failed commit can still leave the in-memory
+            // preferences holding the released queue, so the
+            // pre-release queue is written back before the
+            // failure is reported: whatever that write's own
+            // durability, the in-memory state a later drain in
+            // this process reads is the queue with the head
+            // still held, and the stored read-back below is
+            // what the report counts.
+            storeHeldInboundQueue(queue)
             return HeldQueueDrainResult.StorageFailed(
                 deliveredCount = deliveredCount,
                 remainingCount = storedHeldInboundQueue().size

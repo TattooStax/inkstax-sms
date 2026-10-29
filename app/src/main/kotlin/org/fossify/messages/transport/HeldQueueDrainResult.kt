@@ -30,14 +30,18 @@ sealed interface HeldQueueDrainResult {
 
     /**
      * The brain acked a message but its release could not be
-     * persisted and read back, so the stored queue still holds
-     * it. The message stays held and a later drain redelivers it
-     * against the same source id, which the brain files once —
-     * a storage fault costs a redelivery, never a lost message
-     * and never a silently reordered one. [deliveredCount]
-     * counts only the releases this drain did persist, and
-     * [remainingCount] is the stored queue's size read back
-     * after the failed store.
+     * persisted and read back. The drain restores the
+     * pre-release queue before reporting this outcome, because
+     * a failed synchronous commit can still leave the in-memory
+     * preferences changed — without the restore, a later drain
+     * in the same process would find no head to retry even
+     * though the release never became durable. The message
+     * stays held and a later drain redelivers it against the
+     * same source id, which the brain files once — a storage
+     * fault costs a redelivery, never a lost message and never
+     * a silently reordered one. [deliveredCount] counts only
+     * the releases this drain did persist, and [remainingCount]
+     * is the stored queue's size read back after the restore.
      */
     data class StorageFailed(
         val deliveredCount: Int,
