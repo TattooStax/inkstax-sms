@@ -10,9 +10,6 @@ class Config(context: Context) : BaseConfig(context) {
         fun newInstance(context: Context) = Config(context)
 
         private const val ROLE_POSTURE_NAME = "role_posture_name"
-        private const val PAIRED_ENDPOINT_BASE = "paired_endpoint_base"
-        private const val PAIRED_DEVICE_ID = "paired_device_id"
-        private const val PAIRED_DEVICE_SECRET = "paired_device_secret"
     }
 
     // SMS-3-TOUCHPOINT 1/3: the stored answer to the one posture setup
@@ -21,23 +18,6 @@ class Config(context: Context) : BaseConfig(context) {
     var rolePostureName: String?
         get() = prefs.getString(ROLE_POSTURE_NAME, null)
         set(value) = prefs.edit().putString(ROLE_POSTURE_NAME, value).apply()
-
-    // SMS-7-TOUCHPOINT 1/1: the stored fields of the paired device
-    // credential, kept as plain strings so this config stays free of
-    // seam types; whether they count as this device's credential is
-    // decided in :transport (deviceCredentialFromStored), together
-    // with the on-device token kept outside these preferences.
-    var pairedEndpointBase: String?
-        get() = prefs.getString(PAIRED_ENDPOINT_BASE, null)
-        set(value) = prefs.edit().putString(PAIRED_ENDPOINT_BASE, value).apply()
-
-    var pairedDeviceId: String?
-        get() = prefs.getString(PAIRED_DEVICE_ID, null)
-        set(value) = prefs.edit().putString(PAIRED_DEVICE_ID, value).apply()
-
-    var pairedDeviceSecret: String?
-        get() = prefs.getString(PAIRED_DEVICE_SECRET, null)
-        set(value) = prefs.edit().putString(PAIRED_DEVICE_SECRET, value).apply()
 
     fun saveUseSIMIdAtNumber(number: String, SIMId: Int) {
         prefs.edit().putInt(USE_SIM_ID_PREFIX + number, SIMId).apply()

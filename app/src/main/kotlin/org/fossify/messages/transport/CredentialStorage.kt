@@ -4,9 +4,12 @@ import android.content.Context
 import inkstax.sms.transport.DeviceCredential
 import inkstax.sms.transport.deviceCredentialFromStored
 import java.io.File
-import org.fossify.messages.extensions.config
+import org.fossify.commons.extensions.sharedPrefs
 
 private const val CREDENTIAL_TOKEN_FILE = "device_credential_token"
+private const val PAIRED_ENDPOINT_BASE = "paired_endpoint_base"
+private const val PAIRED_DEVICE_ID = "paired_device_id"
+private const val PAIRED_DEVICE_SECRET = "paired_device_secret"
 
 /**
  * This device's paired credential, read back through the :transport
@@ -20,36 +23,46 @@ private const val CREDENTIAL_TOKEN_FILE = "device_credential_token"
  * The token is read exactly, never trimmed: credential values are
  * exact, and a token that does not name the stored device id as-is
  * is no token for it.
+ *
+ * The fields live in the app's shared preferences (the same store
+ * Config uses), written from here rather than through Config
+ * properties because a credential must be written as one checked,
+ * synchronous batch — three separately applied writes could leave
+ * a mixed record behind, and an unchecked asynchronous write
+ * cannot be reported honestly.
  */
 fun Context.storedDeviceCredential(): DeviceCredential? {
     val tokenDeviceId = runCatching {
         File(noBackupFilesDir, CREDENTIAL_TOKEN_FILE).readText()
     }.getOrNull()
     return deviceCredentialFromStored(
-        storedEndpointBase = config.pairedEndpointBase,
-        storedDeviceId = config.pairedDeviceId,
-        storedSecret = config.pairedDeviceSecret,
+        storedEndpointBase = sharedPrefs.getString(PAIRED_ENDPOINT_BASE, null),
+        storedDeviceId = sharedPrefs.getString(PAIRED_DEVICE_ID, null),
+        storedSecret = sharedPrefs.getString(PAIRED_DEVICE_SECRET, null),
         onDeviceTokenDeviceId = tokenDeviceId
     )
 }
 
 /**
  * Records a credential the pairing exchange minted, together with
- * its on-device token, and returns whether the credential reads
- * back as this device's afterwards. Only values
- * [deviceCredentialFromStored] would accept on read-back may be
- * stored, so a malformed exchange result can never be persisted
- * and then trusted; callers pass the credential
+ * its on-device token, and returns whether the credential is
+ * durably stored and reads back as this device's afterwards. Only
+ * values [deviceCredentialFromStored] would accept on read-back
+ * may be stored, so a malformed exchange result can never be
+ * persisted and then trusted; callers pass the credential
  * [inkstax.sms.transport.exchangedCredentialFor] returned.
  *
- * The token file is written last because it is the commit marker:
- * until it names the new device id, the stored fields — however
- * mixed an interrupted write leaves them — read back as no
- * credential, never as a working key assembled from two pairings.
- * A failed token write therefore leaves the phone unpaired rather
- * than half-paired, and the final read-back is what decides the
- * result this function reports: stored means verified, not
- * attempted.
+ * The fields are written first, in one synchronous commit: if
+ * that commit fails, nothing is reported stored and no token is
+ * written. The token file is written last because it is the
+ * commit marker — until it names the new device id, the stored
+ * fields read back as no credential, never as a working key. A
+ * failed token write likewise leaves the phone unpaired rather
+ * than half-paired, and is reported as failure: the exchange
+ * burned a single-use token to mint this credential, so a caller
+ * told the truth can still hold the returned value and retry
+ * persistence instead of losing it. The final read-back decides
+ * the reported result — stored means verified, not attempted.
  */
 fun Context.storeDeviceCredential(credential: DeviceCredential): Boolean {
     val accepted = deviceCredentialFromStored(
@@ -58,11 +71,20 @@ fun Context.storeDeviceCredential(credential: DeviceCredential): Boolean {
         storedSecret = credential.secret,
         onDeviceTokenDeviceId = credential.deviceId
     ) ?: return false
-    config.pairedEndpointBase = accepted.endpointBase
-    config.pairedDeviceSecret = accepted.secret
-    config.pairedDeviceId = accepted.deviceId
-    runCatching {
+    val committed = sharedPrefs.edit()
+        .putString(PAIRED_ENDPOINT_BASE, accepted.endpointBase)
+        .putString(PAIRED_DEVICE_ID, accepted.deviceId)
+        .putString(PAIRED_DEVICE_SECRET, accepted.secret)
+        .commit()
+    if (!committed) {
+        return false
+    }
+    val tokenWritten = runCatching {
         File(noBackupFilesDir, CREDENTIAL_TOKEN_FILE).writeText(accepted.deviceId)
+        true
+    }.getOrDefault(false)
+    if (!tokenWritten) {
+        return false
     }
     return storedDeviceCredential() == accepted
 }
@@ -71,12 +93,17 @@ fun Context.storeDeviceCredential(credential: DeviceCredential): Boolean {
  * Discards the stored credential and its token. Disconnect is the
  * only way out of the paired state, and a disconnected phone keeps
  * no working key (see :transport's pairingStateAfterDisconnect).
+ * The token is removed first, so from that moment the stored
+ * fields — whatever of them remains — no longer count as a
+ * credential on this device.
  */
 fun Context.clearDeviceCredential() {
-    config.pairedEndpointBase = null
-    config.pairedDeviceId = null
-    config.pairedDeviceSecret = null
     runCatching {
         File(noBackupFilesDir, CREDENTIAL_TOKEN_FILE).delete()
     }
+    sharedPrefs.edit()
+        .remove(PAIRED_ENDPOINT_BASE)
+        .remove(PAIRED_DEVICE_ID)
+        .remove(PAIRED_DEVICE_SECRET)
+        .apply()
 }

@@ -126,19 +126,20 @@ other upstream file is modified.
 
 ## Upstream touchpoint registry (SMS-7, ≤5, tagged in code)
 
-| # | File | Change |
-|---|------|--------|
-| 1 | `app/src/main/kotlin/org/fossify/messages/helpers/Config.kt` | Stores the paired credential's fields as plain strings (`pairedEndpointBase` / `pairedDeviceId` / `pairedDeviceSecret`); whether they count as this device's credential is decided in `:transport` |
-
-Everything else in this slice is a new file
-(`CredentialStorage.kt` in the app-side
+None — zero upstream files are modified in this slice. The whole
+slice is one new file (`CredentialStorage.kt` in the app-side
 `org.fossify.messages.transport` package): it stores a credential
-the exchange minted together with its on-device token in
-no-backup storage, reads it back only through
-`deviceCredentialFromStored`, and clears both on disconnect.
-SMS-7 stores and reads a credential; it does not run the network
-exchange and no scanner reads a QR yet — those act on this
-storage in a later slice.
+the exchange minted in the app's shared preferences as one
+checked, synchronous batch (a credential written as three
+separately applied Config writes could be left mixed or lost
+unreported), together with its on-device token in no-backup
+storage written last as the commit marker; it reads the
+credential back only through `deviceCredentialFromStored`,
+reports a store as successful only after a verifying read-back,
+and clears token and fields on disconnect. SMS-7 stores and
+reads a credential; it does not run the network exchange and no
+scanner reads a QR yet — those act on this storage in a later
+slice.
 
 SMS-3 note: the dedicated posture keeps the upstream startup flow
 unchanged (default role requested, declining it exits). The
