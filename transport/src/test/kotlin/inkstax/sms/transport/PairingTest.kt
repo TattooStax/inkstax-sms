@@ -86,6 +86,18 @@ class PairingTest {
     }
 
     @Test
+    fun `a percent escape spelled with non-ASCII digits is no offer`() {
+        // Arabic-Indic digits, Devanagari digits, and fullwidth hex
+        // letters all carry values a broad digit test would accept;
+        // none of them is the ASCII hex the brain issued, so an
+        // escape spelled with them is malformed, not a token byte.
+        assertNull(pairingOfferFromQrPayload("https://brain.example/companion/start?t=abc%\u0661\u0662"))
+        assertNull(pairingOfferFromQrPayload("https://brain.example/companion/start?t=abc%\u0967\u0968"))
+        assertNull(pairingOfferFromQrPayload("https://brain.example/companion/start?t=abc%\uFF21\uFF22"))
+        assertNull(pairingOfferFromQrPayload("https://brain.example/companion/start?t=abc%1\u0662"))
+    }
+
+    @Test
     fun `a pairing URL with a fragment is no offer`() {
         assertNull(pairingOfferFromQrPayload("https://brain.example/companion/start?t=tok#extra"))
         assertNull(pairingOfferFromQrPayload("https://brain.example/companion/start?t=tok#"))
