@@ -47,8 +47,10 @@ import org.fossify.messages.helpers.LOCK_SCREEN_SENDER
 import org.fossify.messages.helpers.LOCK_SCREEN_SENDER_MESSAGE
 import org.fossify.messages.helpers.MessagesImporter
 import org.fossify.messages.helpers.refreshConversations
+import org.fossify.messages.transport.confirmPairingDisconnect
 import org.fossify.messages.transport.launchPairingScan
 import org.fossify.messages.transport.registerPairingScanner
+import org.fossify.messages.transport.storedDeviceCredential
 import java.util.Locale
 import kotlin.system.exitProcess
 
@@ -110,6 +112,7 @@ class SettingsActivity : SimpleActivity() {
         setupManageBlockedNumbers()
         setupManageBlockedKeywords()
         setupPairCompanion()
+        setupDisconnectCompanion()
         setupChangeDateTimeFormat()
         setupFontSize()
         setupShowCharacterCounter()
@@ -151,6 +154,17 @@ class SettingsActivity : SimpleActivity() {
     private fun setupPairCompanion() = binding.apply {
         settingsPairCompanionHolder.setOnClickListener {
             launchPairingScan(pairingScanner)
+        }
+    }
+
+    // SMS-11-TOUCHPOINT 3/3: the disconnect entry, offered only
+    // while this phone holds a pairing to disconnect from
+    private fun setupDisconnectCompanion() = binding.apply {
+        settingsDisconnectCompanionHolder.beVisibleIf(storedDeviceCredential() != null)
+        settingsDisconnectCompanionHolder.setOnClickListener {
+            confirmPairingDisconnect {
+                settingsDisconnectCompanionHolder.beGone()
+            }
         }
     }
 

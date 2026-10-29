@@ -19,6 +19,12 @@
     <string name="pairing_token_lapsed">That pairing code has expired or already been used. Get a fresh code and scan again.</string>
     <string name="pairing_unreachable">Could not reach the pairing system. Check the connection and scan again.</string>
     <string name="pairing_failed">Pairing failed. Get a fresh code and scan again.</string>
+    <!-- SMS-11-TOUCHPOINT 1/3: the disconnect entry and its outcome messages -->
+    <string name="disconnect_companion">Disconnect from your business system</string>
+    <string name="pairing_disconnect_confirmation">Disconnect this phone from your business system? You can pair it again by scanning a fresh pairing code.</string>
+    <string name="pairing_disconnected">This phone is disconnected</string>
+    <string name="pairing_disconnect_failed">Disconnecting did not finish. Try again.</string>
+    <string name="pairing_not_paired">This phone is not paired</string>
     <string name="delete_conversation_requires_default_messenger">This app is not your default messaging app, so it cannot delete conversations. Delete this conversation in your default messenger instead.</string>
     <string name="message_not_sent_touch_retry">Not sent. Touch to retry.</string>
     <string name="message_sending_error">Your message to \'%s\' has not been sent</string>

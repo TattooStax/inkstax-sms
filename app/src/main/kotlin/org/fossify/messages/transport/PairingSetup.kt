@@ -7,7 +7,6 @@ import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import inkstax.sms.transport.PairingExchangeFailure
 import inkstax.sms.transport.pairingOfferFromQrPayload
-import java.util.concurrent.atomic.AtomicBoolean
 import org.fossify.commons.extensions.toast
 import org.fossify.commons.helpers.ensureBackgroundThread
 import org.fossify.messages.R
@@ -38,15 +37,14 @@ import org.fossify.messages.R
  * credential pairs nothing new — re-pairing is a disconnect
  * first, never a second scan silently replacing a working
  * pairing or burning another single-use token. And one attempt
- * runs at a time: the guard below is process-wide so it survives
+ * runs at a time: the shared guard is process-wide so it survives
  * the hosting activity being recreated mid-exchange, and it
  * covers the paired check, the exchange, and the storage retry
  * together, so two attempts can never interleave their writes
- * into a credential that matches neither.
+ * into a credential that matches neither. The disconnect caller
+ * shares the same guard for its clear, so a disconnect and an
+ * exchange can never interleave either.
  */
-private object PairingAttemptGuard {
-    val inFlight = AtomicBoolean(false)
-}
 fun ComponentActivity.registerPairingScanner(): ActivityResultLauncher<ScanOptions> {
     return registerForActivityResult(ScanContract()) { result ->
         val contents = result.contents ?: return@registerForActivityResult
