@@ -35,24 +35,36 @@ fun Context.storedDeviceCredential(): DeviceCredential? {
 
 /**
  * Records a credential the pairing exchange minted, together with
- * its on-device token. Only values [deviceCredentialFromStored]
- * would accept on read-back may be stored, so a malformed exchange
- * result can never be persisted and then trusted; callers pass the
- * credential [inkstax.sms.transport.exchangedCredentialFor] returned.
+ * its on-device token, and returns whether the credential reads
+ * back as this device's afterwards. Only values
+ * [deviceCredentialFromStored] would accept on read-back may be
+ * stored, so a malformed exchange result can never be persisted
+ * and then trusted; callers pass the credential
+ * [inkstax.sms.transport.exchangedCredentialFor] returned.
+ *
+ * The token file is written last because it is the commit marker:
+ * until it names the new device id, the stored fields — however
+ * mixed an interrupted write leaves them — read back as no
+ * credential, never as a working key assembled from two pairings.
+ * A failed token write therefore leaves the phone unpaired rather
+ * than half-paired, and the final read-back is what decides the
+ * result this function reports: stored means verified, not
+ * attempted.
  */
-fun Context.storeDeviceCredential(credential: DeviceCredential) {
+fun Context.storeDeviceCredential(credential: DeviceCredential): Boolean {
     val accepted = deviceCredentialFromStored(
         storedEndpointBase = credential.endpointBase,
         storedDeviceId = credential.deviceId,
         storedSecret = credential.secret,
         onDeviceTokenDeviceId = credential.deviceId
-    ) ?: return
+    ) ?: return false
     config.pairedEndpointBase = accepted.endpointBase
-    config.pairedDeviceId = accepted.deviceId
     config.pairedDeviceSecret = accepted.secret
+    config.pairedDeviceId = accepted.deviceId
     runCatching {
         File(noBackupFilesDir, CREDENTIAL_TOKEN_FILE).writeText(accepted.deviceId)
     }
+    return storedDeviceCredential() == accepted
 }
 
 /**
