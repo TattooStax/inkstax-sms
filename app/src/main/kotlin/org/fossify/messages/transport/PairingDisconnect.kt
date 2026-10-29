@@ -30,17 +30,25 @@ import org.fossify.messages.R
  * wedge both flows. Inside the guard the paired state is checked
  * again, because it can have changed while the dialog was up:
  * only clearing a credential that is still there counts as a
- * disconnect, never a disconnect that did not happen. The paired check before
- * the dialog is only the entry condition — a phone that is not
- * paired has nothing to disconnect and is told so without a
- * dialog.
+ * disconnect, never a disconnect that did not happen. The check
+ * before the dialog is only the entry condition — a phone with
+ * nothing stored has nothing to disconnect and is told so
+ * without a dialog.
+ *
+ * Both checks key on stored credential material, not on the
+ * usable credential: a clear that only partly finished (one
+ * store removed, the other not) leaves a phone that reads as
+ * unpaired but still holds a leftover token or secret, and that
+ * leftover is exactly what a retry exists to remove. Keying on
+ * the usable credential would hide the entry and reject the
+ * retry, stranding the leftover with no way to clear it.
  */
 fun Activity.confirmPairingDisconnect(onDisconnected: () -> Unit) {
     if (PairingAttemptGuard.inFlight.get()) {
         toast(R.string.pairing_in_progress)
         return
     }
-    if (storedDeviceCredential() == null) {
+    if (!hasStoredCredentialMaterial()) {
         toast(R.string.pairing_not_paired)
         return
     }
@@ -62,7 +70,7 @@ private fun Activity.disconnectPairing(onDisconnected: () -> Unit) {
     }
     ensureBackgroundThread {
         try {
-            val cleared = storedDeviceCredential() != null && clearDeviceCredential()
+            val cleared = hasStoredCredentialMaterial() && clearDeviceCredential()
             runOnUiThread {
                 if (cleared) {
                     toast(R.string.pairing_disconnected)

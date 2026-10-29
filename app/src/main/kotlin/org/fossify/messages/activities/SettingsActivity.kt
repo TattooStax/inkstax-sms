@@ -48,9 +48,9 @@ import org.fossify.messages.helpers.LOCK_SCREEN_SENDER_MESSAGE
 import org.fossify.messages.helpers.MessagesImporter
 import org.fossify.messages.helpers.refreshConversations
 import org.fossify.messages.transport.confirmPairingDisconnect
+import org.fossify.messages.transport.hasStoredCredentialMaterial
 import org.fossify.messages.transport.launchPairingScan
 import org.fossify.messages.transport.registerPairingScanner
-import org.fossify.messages.transport.storedDeviceCredential
 import java.util.Locale
 import kotlin.system.exitProcess
 
@@ -77,8 +77,13 @@ class SettingsActivity : SimpleActivity() {
     private var exportMessagesDialog: ExportMessagesDialog? = null
 
     // SMS-10-TOUCHPOINT 4/4: the pairing scanner launcher, registered
-    // before start like every activity-result launcher in this activity
-    private val pairingScanner = registerPairingScanner()
+    // before start like every activity-result launcher in this activity.
+    // The completion callback refreshes the disconnect entry (SMS-11):
+    // the exchange finishes after this activity resumes, so the resume
+    // refresh alone would leave the entry stale until the next resume.
+    private val pairingScanner = registerPairingScanner {
+        refreshDisconnectCompanionVisibility()
+    }
 
     private val saveDocument =
         registerForActivityResult(ActivityResultContracts.CreateDocument(messagesFileType)) { uri ->
@@ -157,15 +162,20 @@ class SettingsActivity : SimpleActivity() {
         }
     }
 
-    // SMS-11-TOUCHPOINT 3/3: the disconnect entry, offered only
-    // while this phone holds a pairing to disconnect from
-    private fun setupDisconnectCompanion() = binding.apply {
-        settingsDisconnectCompanionHolder.beVisibleIf(storedDeviceCredential() != null)
-        settingsDisconnectCompanionHolder.setOnClickListener {
+    // SMS-11-TOUCHPOINT 3/3: the disconnect entry, offered while
+    // this phone holds any credential material to disconnect from
+    // (a partly finished clear leaves material a retry must reach)
+    private fun setupDisconnectCompanion() {
+        refreshDisconnectCompanionVisibility()
+        binding.settingsDisconnectCompanionHolder.setOnClickListener {
             confirmPairingDisconnect {
-                settingsDisconnectCompanionHolder.beGone()
+                refreshDisconnectCompanionVisibility()
             }
         }
+    }
+
+    private fun refreshDisconnectCompanionVisibility() {
+        binding.settingsDisconnectCompanionHolder.beVisibleIf(hasStoredCredentialMaterial())
     }
 
     private fun setupMessagesExport() {

@@ -90,6 +90,28 @@ fun Context.storeDeviceCredential(credential: DeviceCredential): Boolean {
 }
 
 /**
+ * Whether any credential material remains on this device: the
+ * on-device token file, or any of the stored credential fields.
+ * This is deliberately broader than [storedDeviceCredential]: a
+ * clear that only partly finished leaves material behind (the
+ * token gone but the secret still in preferences, or the fields
+ * removed but the token file still present), and such a phone
+ * reads back as unpaired while the leftover is still there to
+ * remove. Disconnect therefore keys its entry and its retry on
+ * material, not on the usable credential, so a partial clear can
+ * always be retried until nothing remains.
+ */
+fun Context.hasStoredCredentialMaterial(): Boolean {
+    if (File(noBackupFilesDir, CREDENTIAL_TOKEN_FILE).exists()) {
+        return true
+    }
+    val prefs = getSharedPrefs()
+    return prefs.getString(PAIRED_ENDPOINT_BASE, null) != null ||
+        prefs.getString(PAIRED_DEVICE_ID, null) != null ||
+        prefs.getString(PAIRED_DEVICE_SECRET, null) != null
+}
+
+/**
  * Discards the stored credential and its token, and returns
  * whether the phone reads back as unpaired afterwards. Disconnect
  * is the only way out of the paired state, and a disconnected

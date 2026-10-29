@@ -30,7 +30,11 @@ import org.fossify.messages.R
  * Registration must happen before the hosting activity is
  * started, the same rule every activity-result launcher follows;
  * the host registers the launcher once as a field and launches it
- * from its pairing entry point.
+ * from its pairing entry point. The host may pass a paired
+ * callback: it runs on the UI thread when an exchange completes
+ * the pairing, because the exchange finishes on a background
+ * thread after the host has already resumed, so state the host
+ * refreshed on resume cannot see the new credential.
  *
  * Two seam rules bind this caller. PAIRED is terminal (see
  * Pairing.kt in :transport): a phone that already holds a stored
@@ -45,10 +49,12 @@ import org.fossify.messages.R
  * shares the same guard for its clear, so a disconnect and an
  * exchange can never interleave either.
  */
-fun ComponentActivity.registerPairingScanner(): ActivityResultLauncher<ScanOptions> {
+fun ComponentActivity.registerPairingScanner(
+    onPaired: () -> Unit = {}
+): ActivityResultLauncher<ScanOptions> {
     return registerForActivityResult(ScanContract()) { result ->
         val contents = result.contents ?: return@registerForActivityResult
-        handleScannedPairingPayload(contents)
+        handleScannedPairingPayload(contents, onPaired)
     }
 }
 
@@ -70,7 +76,7 @@ fun Activity.launchPairingScan(launcher: ActivityResultLauncher<ScanOptions>) {
  * outcome is reported back on the UI thread in the failure
  * vocabulary the :transport definitions own.
  */
-private fun Activity.handleScannedPairingPayload(contents: String) {
+private fun Activity.handleScannedPairingPayload(contents: String, onPaired: () -> Unit) {
     if (!PairingAttemptGuard.inFlight.compareAndSet(false, true)) {
         toast(R.string.pairing_in_progress)
         return
@@ -89,14 +95,19 @@ private fun Activity.handleScannedPairingPayload(contents: String) {
     toast(R.string.pairing_in_progress)
     ensureBackgroundThread {
         try {
+            var pairedNow = false
             val messageId = when (val result = performPairingExchange(offer)) {
-                is PairingExchangeBindingResult.Stored -> R.string.pairing_succeeded
+                is PairingExchangeBindingResult.Stored -> {
+                    pairedNow = true
+                    R.string.pairing_succeeded
+                }
                 is PairingExchangeBindingResult.StorageFailed -> {
                     // The exchange burned the single-use token to mint
                     // this credential, so the one recovery that does
                     // not need a fresh scan is storing the credential
                     // the result carries, once more, right here.
                     if (storeDeviceCredential(result.credential)) {
+                        pairedNow = true
                         R.string.pairing_succeeded
                     } else {
                         R.string.pairing_storage_failed
@@ -104,7 +115,16 @@ private fun Activity.handleScannedPairingPayload(contents: String) {
                 }
                 is PairingExchangeBindingResult.Failed -> pairingFailureMessage(result.failure)
             }
-            runOnUiThread { toast(messageId) }
+            runOnUiThread {
+                toast(messageId)
+                if (pairedNow) {
+                    // The host resumed before this background exchange
+                    // finished, so any paired-state UI it refreshed on
+                    // resume predates the stored credential; the
+                    // completion callback is what brings it current.
+                    onPaired()
+                }
+            }
         } finally {
             PairingAttemptGuard.inFlight.set(false)
         }
