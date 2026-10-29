@@ -48,6 +48,7 @@ import org.fossify.messages.helpers.LOCK_SCREEN_SENDER_MESSAGE
 import org.fossify.messages.helpers.MessagesImporter
 import org.fossify.messages.helpers.refreshConversations
 import org.fossify.messages.transport.confirmPairingDisconnect
+import org.fossify.messages.transport.ensureHeartbeatSchedule
 import org.fossify.messages.transport.hasStoredCredentialMaterial
 import org.fossify.messages.transport.launchPairingScan
 import org.fossify.messages.transport.registerPairingScanner
@@ -166,6 +167,11 @@ class SettingsActivity : SimpleActivity() {
     // this phone holds any credential material to disconnect from
     // (a partly finished clear leaves material a retry must reach)
     private fun setupDisconnectCompanion() {
+        // SMS-16-TOUCHPOINT 3/3: Settings is this app's foreground
+        // home, so each visit re-arms a paired phone's heartbeat
+        // schedule — the recovery for a start the platform refused
+        // while the app was backgrounded during pairing.
+        ensureHeartbeatSchedule()
         refreshDisconnectCompanionVisibility()
         binding.settingsDisconnectCompanionHolder.setOnClickListener {
             confirmPairingDisconnect {

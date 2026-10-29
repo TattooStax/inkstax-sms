@@ -346,3 +346,30 @@ UNSET and the question is asked again there. Subscription pinning
 for the personal posture is policy in `:transport`
 (`requiresPinnedSubscription`); its enforcement at send selection
 is a later slice, not claimed here.
+
+## Upstream touchpoint registry (SMS-16, ≤5, tagged in code)
+
+Three upstream files are modified in this slice:
+(1) `AndroidManifest.xml` — the FOREGROUND_SERVICE and
+FOREGROUND_SERVICE_DATA_SYNC permissions and the heartbeat
+service entry; (2) `strings.xml` \u2014 the heartbeat channel name
+and the persistent notification's state texts; (3)
+`SettingsActivity.kt` \u2014 one call on each visit re-arms a paired
+phone's heartbeat schedule, the recovery for a start the
+platform refused while the app was backgrounded during pairing. Everything else
+is new files: `HeartbeatSchedule.kt` and its test in
+`:transport` (the schedule rhythm — first beat immediate, later
+beats one full interval — and the notification-state vocabulary
+every binding reads its latest outcome through), and
+`HeartbeatService.kt` and `HeartbeatAlarmReceiver.kt` in the
+app-side `org.fossify.messages.transport` package (a wake-up
+alarm on that schedule starts a one-beat foreground service —
+a standing dataSync service would exhaust the platform's
+foreground-service budget and a handler timer would sleep
+through deep idle — and the persistent notification is a
+standing notification each beat updates). Pairing starts the service
+and disconnect stops it, through edits to this track's own
+app-side callers; a beat that finds no usable credential stops
+the service again. SMS-16 sends no stale-alert (brain-side) and
+no message ack, and nothing restarts the service after a reboot
+or a force-stop yet — those act on this caller in later slices.
