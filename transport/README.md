@@ -1,4 +1,4 @@
-# :transport — the bridge seam (SMS-1, SMS-2, SMS-3, SMS-4, SMS-5, SMS-6, SMS-7, SMS-8, SMS-9, SMS-10, SMS-11), SMS-12, SMS-14, SMS-15, SMS-18
+# :transport — the bridge seam (SMS-1, SMS-2, SMS-3, SMS-4, SMS-5, SMS-6, SMS-7, SMS-8, SMS-9, SMS-10, SMS-11), SMS-12, SMS-14, SMS-15, SMS-18, SMS-19
 
 Pure Kotlin/JVM module holding the InkStax SMS layer's one
 bridge seam. SMS-1 extracted the outbound side; SMS-2 adds the
@@ -98,7 +98,25 @@ inbound side with its local binding first.
   from an unreachable endpoint). Only a message the shared
   disposition rule handles, carrying a source id, builds a
   request at all. Pure definitions only: no binding performs
-  the POST yet, and no outbound ack wire is defined yet.
+  the POST yet.
+- `OutboundAckWire.kt` — the outbound ack wire definitions
+  (SMS-19): the one report shape every binding uses to tell the
+  brain a reply actually sent or failed (the reply under its
+  source id, the outcome, the sending error code on a failure,
+  and the report time, as a flat JSON string object, POSTed to
+  `/companion/outbound-ack` on the stored credential's endpoint,
+  the secret carried only in the authorization value, in its
+  base64url-encoded spelling, never in the body) and the one
+  reading of the answer (only No Content is the brain recording
+  the report; a credential refusal is its own failure, distinct
+  from an unreachable endpoint). The body carries no message
+  content — the brain already holds the reply it dispatched.
+  The phone's send outcome, not the brain's answer, moves the
+  ack state, through SMS-4's transition; a failure's free-text
+  detail stays on the phone. A credential the seam does not
+  accept for its own endpoint, and an identity that is blank or
+  carries whitespace, build no report at all. Pure definitions
+  only: no binding performs the POST yet.
 - `InboundSink` + `InboundSms` + `inboundDispositionFor` — the
   inbound side of the seam (SMS-2). The disposition rule is
   shared by every binding: SMS text is handled, MMS is
@@ -426,6 +444,19 @@ defines the inbound delivery request shape and the reading of
 its answer (status only — the brain ack carries no body), so
 a binding that performs the delivery in a later slice sends
 the one shape and judges the answer the one way. SMS-18 runs
-no network call and holds no queue — the binding, the
-held-message queue it drains, and the outbound ack wire act
-on these definitions in later slices.
+no network call and holds no queue — the binding and the
+held-message queue it drains act on these definitions in
+later slices.
+
+## Upstream touchpoint registry (SMS-19, ≤5, tagged in code)
+
+None — zero upstream files are modified in this slice. The
+whole slice is new files inside `:transport`
+(`OutboundAckWire.kt` and its test) plus this README: it
+defines the outbound ack report shape and the reading of its
+answer (status only — the recording answer carries no body),
+so a binding that performs the report in a later slice sends
+the one shape and judges the answer the one way. SMS-19 runs
+no network call and sends no ack — the bindings that perform
+the SMS-18 delivery and this report, and the held-message
+queue they drain, act on these definitions in later slices.
