@@ -1,4 +1,4 @@
-# :transport — the bridge seam (SMS-1, SMS-2, SMS-3, SMS-4, SMS-5, SMS-6, SMS-7, SMS-8, SMS-9, SMS-10, SMS-11), SMS-12, SMS-14, SMS-15, SMS-18, SMS-19, SMS-20, SMS-21, SMS-22
+# :transport — the bridge seam (SMS-1, SMS-2, SMS-3, SMS-4, SMS-5, SMS-6, SMS-7, SMS-8, SMS-9, SMS-10, SMS-11), SMS-12, SMS-14, SMS-15, SMS-18, SMS-19, SMS-20, SMS-21, SMS-22, SMS-26
 
 Pure Kotlin/JVM module holding the InkStax SMS layer's one
 bridge seam. SMS-1 extracted the outbound side; SMS-2 adds the
@@ -122,6 +122,22 @@ inbound side with its local binding first.
   carries whitespace, build no report at all. Pure definitions
   only in this module: the binding that performs the POST lives
   app-side (SMS-21).
+- `PendingReportQueue.kt` — the pending outbound report queue
+  definitions (SMS-26): the one queue shape every binding holds
+  outbound ack reports that have not landed yet in — a plain
+  immutable list where only a verdict the report wire itself
+  would carry may be held (a source id that is not blank and
+  carries no whitespace, a non-negative report time, and an
+  error code that agrees with the verdict); a re-seen source id
+  is the pending report itself, never a second filing, because
+  the phone's verdict on a send is terminal and the first held
+  verdict is the one owed; the head is next in reached order;
+  and an entry leaves only when the brain records the report,
+  every failed outcome leaving it in place for a re-report
+  against the same source id. Pure definitions only: no
+  storage, no caller, and no drain loop lives here — the
+  app-side queue storage and the caller that reports verdicts
+  act on these definitions in later slices.
 - `InboundSink` + `InboundSms` + `inboundDispositionFor` — the
   inbound side of the seam (SMS-2). The disposition rule is
   shared by every binding: SMS text is handled, MMS is
