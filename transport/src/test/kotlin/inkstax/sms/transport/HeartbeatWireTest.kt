@@ -21,9 +21,40 @@ class HeartbeatWireTest {
     @Test
     fun `the secret travels only in the authorization value never in the body`() {
         val request = heartbeatRequestFor(credential, sentAt)
-        assertEquals("Bearer secret-abc", request?.authorization)
+        assertEquals("Bearer c2VjcmV0LWFiYw", request?.authorization)
         assertFalse(request!!.body.contains("secret-abc"))
         assertFalse(request.url.contains("secret-abc"))
+        assertFalse(request.authorization.contains("secret-abc"))
+    }
+
+    @Test
+    fun `any minted secret encodes to a valid authorization value that decodes back to itself`() {
+        val quoted = DeviceCredential("https://brain.example", "device-1", "sec\"ret-Abc")
+        assertEquals("Bearer c2VjInJldC1BYmM", heartbeatRequestFor(quoted, sentAt)?.authorization)
+        val control = DeviceCredential("https://brain.example", "device-1", "a\u0001secret")
+        val authorization = heartbeatRequestFor(control, sentAt)?.authorization
+        assertEquals("Bearer YQFzZWNyZXQ", authorization)
+        val decoded = java.util.Base64.getUrlDecoder().decode(authorization!!.removePrefix("Bearer "))
+        assertEquals("a\u0001secret", String(decoded, Charsets.UTF_8))
+    }
+
+    @Test
+    fun `a credential endpoint with a trailing slash still builds the one heartbeat path`() {
+        val slashed = DeviceCredential("https://brain.example/", "device-1", "secret-abc")
+        assertEquals(
+            "https://brain.example/companion/heartbeat",
+            heartbeatRequestFor(slashed, sentAt)?.url
+        )
+    }
+
+    @Test
+    fun `the request rendering never shows the secret raw or encoded`() {
+        val rendered = heartbeatRequestFor(credential, sentAt).toString()
+        assertFalse(rendered.contains("secret-abc"))
+        assertFalse(rendered.contains("c2VjcmV0LWFiYw"))
+        assertTrue(rendered.contains("<redacted>"))
+        assertTrue(rendered.startsWith("HeartbeatRequest(url=https://brain.example/companion/heartbeat"))
+        assertTrue(rendered.endsWith("authorization=Bearer <redacted>)"))
     }
 
     @Test

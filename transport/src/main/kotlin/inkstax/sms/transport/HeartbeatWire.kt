@@ -16,7 +16,12 @@ package inkstax.sms.transport
  * endpoint, authenticated by the credential itself: the device id
  * travels in the JSON body and the secret travels only in the
  * authorization value, never in the body, so a request body that
- * gets logged somewhere can never leak the device's key. The body
+ * gets logged somewhere can never leak the device's key. The
+ * authorization value carries the secret base64url-encoded: a
+ * minted secret is an opaque value that may contain characters
+ * no header value may carry, and the encoded spelling is a valid
+ * header value for every secret the exchange can mint — the
+ * brain decodes it to recover the secret itself. The body
  * also carries the phone's send time, so the brain can tell a beat
  * that was delayed in transit from one that was never sent; the
  * brain's own receipt time is what [bridgeHealthAt] judges, never
@@ -56,14 +61,23 @@ const val HEARTBEAT_AUTHORIZATION_SCHEME: String = "Bearer"
  * One heartbeat request, ready for a binding to POST: the URL on
  * the credential's endpoint, the JSON body carrying the device id
  * and the send time, and the authorization value carrying the
- * secret. The secret appears only in [authorization] — it is a
- * credential, never logged and never part of the body.
+ * secret. The secret appears only in [authorization], in its
+ * encoded spelling — it is a credential, never logged and never
+ * part of the body. The generated data-class rendering would
+ * print that value verbatim, so [toString] redacts it: a request
+ * that lands in a log line shows where the beat was going, never
+ * the key it carried.
  */
 data class HeartbeatRequest(
     val url: String,
     val body: String,
     val authorization: String
-)
+) {
+    override fun toString(): String {
+        return "HeartbeatRequest(url=" + url + ", body=" + body +
+            ", authorization=" + HEARTBEAT_AUTHORIZATION_SCHEME + " <redacted>)"
+    }
+}
 
 /**
  * The heartbeat request for a stored [credential] beaten at
@@ -82,11 +96,22 @@ fun heartbeatRequestFor(credential: DeviceCredential, sentAtMillis: Long): Heart
         return null
     }
     return HeartbeatRequest(
-        url = credential.endpointBase + HEARTBEAT_PATH,
+        url = credential.endpointBase.trimEnd('/') + HEARTBEAT_PATH,
         body = "{\"$HEARTBEAT_DEVICE_FIELD\":${jsonString(credential.deviceId)}," +
             "\"$HEARTBEAT_SENT_AT_FIELD\":${jsonString(sentAtMillis.toString())}}",
-        authorization = "$HEARTBEAT_AUTHORIZATION_SCHEME ${credential.secret}"
+        authorization = "$HEARTBEAT_AUTHORIZATION_SCHEME ${base64Url(credential.secret)}"
     )
+}
+
+/**
+ * The base64url spelling of a value, without padding. The
+ * alphabet is exactly the characters a header value may carry,
+ * so any opaque secret encodes to a valid authorization value,
+ * and decoding the spelling recovers the value itself.
+ */
+private fun base64Url(value: String): String {
+    return java.util.Base64.getUrlEncoder().withoutPadding()
+        .encodeToString(value.toByteArray(Charsets.UTF_8))
 }
 
 /** Why a heartbeat was not recorded. */

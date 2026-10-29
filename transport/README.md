@@ -75,8 +75,8 @@ inbound side with its local binding first.
   the one request shape every binding beats with (the device id
   and the phone's send time as a flat JSON string object, POSTed
   to `/companion/heartbeat` on the stored credential's endpoint,
-  the secret carried only in the authorization value, never in
-  the body) and the one reading of the answer (only No Content
+  the secret carried only in the authorization value, in its
+  base64url-encoded spelling, never in the body) and the one reading of the answer (only No Content
   is a recorded beat — the ack carries no body and no message
   state, so a healthy link can never be mistaken for a delivered
   message; a credential refusal is its own failure, distinct
