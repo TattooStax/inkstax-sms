@@ -392,8 +392,12 @@ never a lost beat. The boot receiver restores only a paired
 phone (a stored credential is the signal it was paired
 before the reboot): it reposts the persistent notification
 in its starting state, re-arms the interval alarm first, then
-beats at once through the one-beat service or inline when
-the start is refused. An unpaired phone restores nothing.
+beats at once — inline on current Android, which forbids
+starting a dataSync foreground service from a boot broadcast
+and enforces the ban inside the service's own foreground
+call, and on older versions through the one-beat service
+with the same inline path as the fallback when that start
+is refused. An unpaired phone restores nothing.
 A force-stopped app receives no boot broadcast, so the
 Settings-visit re-arm remains that case's recovery. SMS-17
 sends no stale-alert (brain-side) and no message ack.

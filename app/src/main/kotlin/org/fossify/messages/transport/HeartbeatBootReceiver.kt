@@ -3,6 +3,7 @@ package org.fossify.messages.transport
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import inkstax.sms.transport.HeartbeatNotificationState
 import inkstax.sms.transport.nextHeartbeatDelayMillis
 import org.fossify.commons.helpers.ensureBackgroundThread
@@ -27,14 +28,20 @@ import org.fossify.commons.helpers.ensureBackgroundThread
  * is a platform rule no receiver can change — so the
  * Settings-visit re-arm remains the recovery for that case.
  *
- * The beat normally runs in the one-beat foreground service.
- * When the platform refuses that start, the receiver runs the
- * beat inline instead, on a background thread under goAsync —
- * the same fallback the alarm receiver uses, for the same
- * reason: receiver code itself is background-permitted, so the
- * fallback loses no beat. The alarm is set before either path
- * runs, so a beat lost to a refused start or a cut-short inline
- * window costs one beat, never the schedule.
+ * The beat's path depends on the platform version. Current
+ * Android forbids starting a dataSync foreground service from a
+ * boot broadcast, and it enforces the ban inside the service's
+ * own foreground call rather than at the start request — so on
+ * those versions an accepted start would still fail, inside the
+ * service, after this receiver had already given up its inline
+ * path. The boot beat therefore runs inline there, on a
+ * background thread under goAsync: receiver code itself is
+ * background-permitted. On older versions the beat runs in the
+ * one-beat foreground service, with the same inline path as the
+ * fallback when that start is refused — the arrangement the
+ * alarm receiver uses, for the same reason. The alarm is set
+ * before either path runs, so a beat lost to a refused start or
+ * a cut-short inline window costs one beat, never the schedule.
  */
 class HeartbeatBootReceiver : BroadcastReceiver() {
 
@@ -47,7 +54,9 @@ class HeartbeatBootReceiver : BroadcastReceiver() {
         }
         context.postHeartbeatNotification(HeartbeatNotificationState.STARTING)
         context.scheduleNextHeartbeat(nextHeartbeatDelayMillis(isFirstBeat = false))
-        if (context.tryStartHeartbeatBeatService()) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM &&
+            context.tryStartHeartbeatBeatService()
+        ) {
             return
         }
         val pendingResult = goAsync()
