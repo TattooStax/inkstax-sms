@@ -4,7 +4,7 @@ import android.content.Context
 import inkstax.sms.transport.DeviceCredential
 import inkstax.sms.transport.deviceCredentialFromStored
 import java.io.File
-import org.fossify.commons.extensions.sharedPrefs
+import org.fossify.commons.extensions.getSharedPrefs
 
 private const val CREDENTIAL_TOKEN_FILE = "device_credential_token"
 private const val PAIRED_ENDPOINT_BASE = "paired_endpoint_base"
@@ -36,9 +36,9 @@ fun Context.storedDeviceCredential(): DeviceCredential? {
         File(noBackupFilesDir, CREDENTIAL_TOKEN_FILE).readText()
     }.getOrNull()
     return deviceCredentialFromStored(
-        storedEndpointBase = sharedPrefs.getString(PAIRED_ENDPOINT_BASE, null),
-        storedDeviceId = sharedPrefs.getString(PAIRED_DEVICE_ID, null),
-        storedSecret = sharedPrefs.getString(PAIRED_DEVICE_SECRET, null),
+        storedEndpointBase = getSharedPrefs().getString(PAIRED_ENDPOINT_BASE, null),
+        storedDeviceId = getSharedPrefs().getString(PAIRED_DEVICE_ID, null),
+        storedSecret = getSharedPrefs().getString(PAIRED_DEVICE_SECRET, null),
         onDeviceTokenDeviceId = tokenDeviceId
     )
 }
@@ -71,7 +71,7 @@ fun Context.storeDeviceCredential(credential: DeviceCredential): Boolean {
         storedSecret = credential.secret,
         onDeviceTokenDeviceId = credential.deviceId
     ) ?: return false
-    val committed = sharedPrefs.edit()
+    val committed = getSharedPrefs().edit()
         .putString(PAIRED_ENDPOINT_BASE, accepted.endpointBase)
         .putString(PAIRED_DEVICE_ID, accepted.deviceId)
         .putString(PAIRED_DEVICE_SECRET, accepted.secret)
@@ -101,7 +101,7 @@ fun Context.clearDeviceCredential() {
     runCatching {
         File(noBackupFilesDir, CREDENTIAL_TOKEN_FILE).delete()
     }
-    sharedPrefs.edit()
+    getSharedPrefs().edit()
         .remove(PAIRED_ENDPOINT_BASE)
         .remove(PAIRED_DEVICE_ID)
         .remove(PAIRED_DEVICE_SECRET)
