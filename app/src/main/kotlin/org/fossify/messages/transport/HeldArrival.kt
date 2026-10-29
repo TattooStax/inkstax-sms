@@ -10,16 +10,6 @@ import inkstax.sms.transport.InboundSms
 import inkstax.sms.transport.heldInboundMessageFor
 import inkstax.sms.transport.heldQueueAfterArrival
 
-/**
- * Serializes every arrival's hold in this process: two
- * broadcasts landing together fold against the same stored
- * queue, and without one order between them the later store
- * overwrites the earlier hold. The lock is held only for the
- * hold itself — never across a delivery — so an arrival never
- * waits on the network behind another arrival's drain.
- */
-private val heldArrivalLock = Any()
-
 private const val HELD_DRAIN_WORK_NAME = "held_inbound_drain"
 
 /**
@@ -65,7 +55,7 @@ private const val HELD_DRAIN_WORK_NAME = "held_inbound_drain"
  */
 fun Context.holdAndDrainInboundArrival(message: InboundSms): Boolean {
     val held = heldInboundMessageFor(message) ?: return false
-    val isHeld = synchronized(heldArrivalLock) {
+    val isHeld = synchronized(HeldQueueGuard.lock) {
         if (storedDeviceCredential() == null) {
             false
         } else {
