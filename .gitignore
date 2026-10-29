@@ -11,3 +11,7 @@ keystore.properties
 fastlane/fastlane.json
 fastlane/report.xml
 .kotlin/
+
+# The :transport module is this fork's own module; the upstream
+# ignore rules predate it, so its build output needs its own line.
+/transport/build/
