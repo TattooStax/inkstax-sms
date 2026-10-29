@@ -47,6 +47,8 @@ import org.fossify.messages.helpers.LOCK_SCREEN_SENDER
 import org.fossify.messages.helpers.LOCK_SCREEN_SENDER_MESSAGE
 import org.fossify.messages.helpers.MessagesImporter
 import org.fossify.messages.helpers.refreshConversations
+import org.fossify.messages.transport.launchPairingScan
+import org.fossify.messages.transport.registerPairingScanner
 import java.util.Locale
 import kotlin.system.exitProcess
 
@@ -71,6 +73,10 @@ class SettingsActivity : SimpleActivity() {
         }
 
     private var exportMessagesDialog: ExportMessagesDialog? = null
+
+    // SMS-10-TOUCHPOINT 4/4: the pairing scanner launcher, registered
+    // before start like every activity-result launcher in this activity
+    private val pairingScanner = registerPairingScanner()
 
     private val saveDocument =
         registerForActivityResult(ActivityResultContracts.CreateDocument(messagesFileType)) { uri ->
@@ -103,6 +109,7 @@ class SettingsActivity : SimpleActivity() {
         setupLanguage()
         setupManageBlockedNumbers()
         setupManageBlockedKeywords()
+        setupPairCompanion()
         setupChangeDateTimeFormat()
         setupFontSize()
         setupShowCharacterCounter()
@@ -138,6 +145,12 @@ class SettingsActivity : SimpleActivity() {
             binding.settingsMigratingLabel
         ).forEach {
             it.setTextColor(getProperPrimaryColor())
+        }
+    }
+
+    private fun setupPairCompanion() = binding.apply {
+        settingsPairCompanionHolder.setOnClickListener {
+            launchPairingScan(pairingScanner)
         }
     }
 
