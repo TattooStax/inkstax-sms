@@ -14,8 +14,9 @@ package inkstax.sms.transport
  *
  * This slice defines the interface only. No bridge protocol is
  * implemented here or in the app-side local binding: there is no
- * wire format, no ack/heartbeat state, and no transport over a
- * network in this code. V1 is SMS text only; MMS stays on the
+ * wire format and no transport over a network in this code (the
+ * ack/heartbeat states live in FailureHonesty.kt as definitions
+ * only). V1 is SMS text only; MMS stays on the
  * existing app-side path until its own slice (see
  * [outboundChannel], which only makes the routing decision that
  * used to be inlined in the app).

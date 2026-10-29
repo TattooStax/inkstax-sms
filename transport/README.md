@@ -1,4 +1,4 @@
-# :transport — the bridge seam (SMS-1, SMS-2, SMS-3)
+# :transport — the bridge seam (SMS-1, SMS-2, SMS-3, SMS-4)
 
 Pure Kotlin/JVM module holding the InkStax SMS layer's one
 bridge seam. SMS-1 extracted the outbound side; SMS-2 adds the
@@ -20,6 +20,14 @@ inbound side with its local binding first.
   PERMISSIONS_ONLY (personal). UNSET is the fail-safe: no default
   role may be requested until the question is answered, and an
   unrecognised stored value reads back as UNSET.
+- `FailureHonesty.kt` — the failure-honesty states (SMS-4):
+  heartbeat health (15-min heartbeat, one missed beat OVERDUE,
+  stale-alert at 30 min of silence, never-heartbeated reads stale),
+  the dual-ack transitions (inbound HELD until the brain acks;
+  outbound QUEUED until the phone acks sent, terminal states never
+  move backwards), and the received-late rule. Pure definitions
+  only: no timer, scheduler, or alert sending lives here — a
+  binding supplies timestamps/events and acts on the states.
 - `InboundSink` + `InboundSms` + `inboundDispositionFor` — the
   inbound side of the seam (SMS-2). The disposition rule is
   shared by every binding: SMS text is handled, MMS is
@@ -33,10 +41,12 @@ inbound side with its local binding first.
 - **GMS-free, Android-free.** This module depends on the Kotlin
   standard library only (JUnit for its tests). The local-mode
   build's GMS-free invariant is structural here.
-- **No bridge protocol yet.** No wire format, no ack/heartbeat
-  state, no network transport, no endpoint or credential
-  material. The local binding is in-process; host/cloud bindings
-  stay design-intent until their own slices open.
+- **No bridge protocol yet.** No wire format, no network
+  transport, no endpoint or credential material. SMS-4 defines
+  the ack/heartbeat *states* every binding shares, but no binding
+  sends a heartbeat or an ack yet. The local binding is
+  in-process; host/cloud bindings stay design-intent until their
+  own slices open.
 - **No second intake, store, or scheduler.** Receivers persist
   through the existing provider/app store first; the seam only
   classifies and hands off.
