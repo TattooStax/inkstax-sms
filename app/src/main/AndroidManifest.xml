@@ -550,5 +550,14 @@
             android:name=".transport.HeartbeatAlarmReceiver"
             android:exported="false" />
 
+        <!-- SMS-17-TOUCHPOINT 1/1: a reboot clears the heartbeat alarm and its notification -->
+        <receiver
+            android:name=".transport.HeartbeatBootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
     </application>
 </manifest>

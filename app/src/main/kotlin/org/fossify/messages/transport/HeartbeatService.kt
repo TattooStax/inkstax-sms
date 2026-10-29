@@ -158,6 +158,28 @@ internal fun Context.runHeartbeatBeatOnce(isStopped: () -> Boolean = { false }) 
 }
 
 /**
+ * Tries to start the one-beat foreground service, reporting
+ * whether the platform accepted the start. Only an exact alarm
+ * and a few other moments carry the platform's exemption for
+ * starting a foreground service from the background, so callers
+ * whose start may be refused get the refusal as a result rather
+ * than an exception: each of them has an inline fallback that
+ * runs the beat itself, and a refused start must select that
+ * fallback, never lose the beat or fail the caller.
+ */
+@Suppress("SwallowedException")
+internal fun Context.tryStartHeartbeatBeatService(): Boolean {
+    return try {
+        ContextCompat.startForegroundService(this, Intent(this, HeartbeatService::class.java))
+        true
+    } catch (e: IllegalStateException) {
+        // No background-start exemption for this caller; the
+        // caller runs the beat inline instead.
+        false
+    }
+}
+
+/**
  * Starts the heartbeat schedule for a phone that has just paired:
  * the persistent notification goes up in its starting state, the
  * first beat runs at once through the one-beat service, and the

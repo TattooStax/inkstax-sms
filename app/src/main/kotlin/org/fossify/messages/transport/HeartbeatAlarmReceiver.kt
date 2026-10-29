@@ -7,7 +7,6 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.SystemClock
-import androidx.core.content.ContextCompat
 import inkstax.sms.transport.nextHeartbeatDelayMillis
 import org.fossify.commons.helpers.ensureBackgroundThread
 
@@ -42,7 +41,7 @@ class HeartbeatAlarmReceiver : BroadcastReceiver() {
             return
         }
         context.scheduleNextHeartbeat(nextHeartbeatDelayMillis(isFirstBeat = false))
-        if (startBeatService(context)) {
+        if (context.tryStartHeartbeatBeatService()) {
             return
         }
         val pendingResult = goAsync()
@@ -52,18 +51,6 @@ class HeartbeatAlarmReceiver : BroadcastReceiver() {
             } finally {
                 pendingResult.finish()
             }
-        }
-    }
-
-    @Suppress("SwallowedException")
-    private fun startBeatService(context: Context): Boolean {
-        return try {
-            ContextCompat.startForegroundService(context, Intent(context, HeartbeatService::class.java))
-            true
-        } catch (e: IllegalStateException) {
-            // No background-start exemption for this firing; the
-            // caller runs the beat inline instead.
-            false
         }
     }
 }
