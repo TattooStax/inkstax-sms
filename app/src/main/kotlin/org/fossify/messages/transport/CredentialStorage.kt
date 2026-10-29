@@ -61,7 +61,9 @@ fun Context.storeDeviceCredential(credential: DeviceCredential) {
  * no working key (see :transport's pairingStateAfterDisconnect).
  */
 fun Context.clearDeviceCredential() {
-    config.clearPairedCredential()
+    config.pairedEndpointBase = null
+    config.pairedDeviceId = null
+    config.pairedDeviceSecret = null
     runCatching {
         File(noBackupFilesDir, CREDENTIAL_TOKEN_FILE).delete()
     }

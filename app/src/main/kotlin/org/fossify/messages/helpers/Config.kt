@@ -39,14 +39,6 @@ class Config(context: Context) : BaseConfig(context) {
         get() = prefs.getString(PAIRED_DEVICE_SECRET, null)
         set(value) = prefs.edit().putString(PAIRED_DEVICE_SECRET, value).apply()
 
-    fun clearPairedCredential() {
-        prefs.edit()
-            .remove(PAIRED_ENDPOINT_BASE)
-            .remove(PAIRED_DEVICE_ID)
-            .remove(PAIRED_DEVICE_SECRET)
-            .apply()
-    }
-
     fun saveUseSIMIdAtNumber(number: String, SIMId: Int) {
         prefs.edit().putInt(USE_SIM_ID_PREFIX + number, SIMId).apply()
     }

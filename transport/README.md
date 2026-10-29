@@ -128,7 +128,7 @@ other upstream file is modified.
 
 | # | File | Change |
 |---|------|--------|
-| 1 | `app/src/main/kotlin/org/fossify/messages/helpers/Config.kt` | Stores the paired credential's fields as plain strings (`pairedEndpointBase` / `pairedDeviceId` / `pairedDeviceSecret`) plus a clear for all three; whether they count as this device's credential is decided in `:transport` |
+| 1 | `app/src/main/kotlin/org/fossify/messages/helpers/Config.kt` | Stores the paired credential's fields as plain strings (`pairedEndpointBase` / `pairedDeviceId` / `pairedDeviceSecret`); whether they count as this device's credential is decided in `:transport` |
 
 Everything else in this slice is a new file
 (`CredentialStorage.kt` in the app-side
