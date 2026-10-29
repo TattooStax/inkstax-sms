@@ -13,6 +13,8 @@ import org.fossify.commons.helpers.ContactLookupResult
 import org.fossify.commons.helpers.SimpleContactsHelper
 import org.fossify.commons.helpers.ensureBackgroundThread
 import org.fossify.messages.helpers.ReceiverUtils.isMessageFilteredOut
+import org.fossify.messages.helpers.refreshConversations
+import org.fossify.messages.helpers.refreshMessages
 import org.fossify.messages.transport.LocalInboundSink
 import org.fossify.messages.transport.storedRolePosture
 
@@ -69,6 +71,14 @@ class SmsReceivedReceiver : BroadcastReceiver() {
                         subscriptionId = intent.getIntExtra("subscription", -1)
                     )
                 )
+
+                // Open screens reload from the provider on these events,
+                // as they do for the default intake. The reload races the
+                // default app's own provider insert; a screen that reloads
+                // first still converges on its next resume, which is the
+                // existing behaviour for any external provider change.
+                refreshMessages()
+                refreshConversations()
             } finally {
                 pending.finish()
             }

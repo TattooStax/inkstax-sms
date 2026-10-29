@@ -206,6 +206,19 @@ class MainActivity : SimpleActivity() {
         }
     }
 
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == receiveSmsPermissionRequest) {
+            // The receive-permission answer (grant or denial) unblocks
+            // the rest of the startup permission flow.
+            askPermissions()
+        }
+    }
+
     override fun onActivityResult(requestCode: Int, resultCode: Int, resultData: Intent?) {
         super.onActivityResult(requestCode, resultCode, resultData)
         if (requestCode == MAKE_DEFAULT_APP_REQUEST) {
@@ -233,20 +246,24 @@ class MainActivity : SimpleActivity() {
             // SMS_RECEIVED is how a non-default app hears about incoming
             // messages at all, so the permissions-only posture needs its
             // runtime permission requested explicitly; the Fossify
-            // permission helper has no constant for it. If it is denied,
-            // the app still opens — inbound copies simply cannot arrive
-            // until the user grants it.
+            // permission helper has no constant for it. The request must
+            // finish before askPermissions() starts its own requests —
+            // Android drops overlapping permission requests — so the
+            // flow continues in onRequestPermissionsResult. If it is
+            // denied, the app still opens; inbound copies simply cannot
+            // arrive until the user grants it.
             val receiveSmsGranted = ContextCompat.checkSelfPermission(
                 this, Manifest.permission.RECEIVE_SMS
             ) == PackageManager.PERMISSION_GRANTED
-            if (!receiveSmsGranted) {
+            if (receiveSmsGranted) {
+                askPermissions()
+            } else {
                 ActivityCompat.requestPermissions(
                     this,
                     arrayOf(Manifest.permission.RECEIVE_SMS),
                     receiveSmsPermissionRequest
                 )
             }
-            askPermissions()
             return
         }
 

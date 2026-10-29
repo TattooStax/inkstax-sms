@@ -1,6 +1,10 @@
 package org.fossify.messages.transport
 
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.provider.Telephony
 import android.telephony.PhoneNumberUtils
 import android.widget.Toast.LENGTH_LONG
 import inkstax.sms.transport.MessageTransport
@@ -33,7 +37,14 @@ class LocalMessageTransport(private val context: Context) : MessageTransport {
     // that total mapping is the seam's contract, so the generic catch is intentional.
     @Suppress("TooGenericExceptionCaught")
     override fun sendSms(message: OutboundSms): TransportOutcome {
-        if (context.storedRolePosture() == RolePosture.PERMISSIONS_ONLY) {
+        // The direct path is for a phone where this app is NOT the
+        // default SMS app. Posture alone does not decide it: an install
+        // that already holds the default role and then answers
+        // "personal" still owns the provider, so its sends keep the
+        // persisting path until the user actually switches the default
+        // messenger — otherwise sent messages would vanish from history.
+        val isDefaultSmsApp = Telephony.Sms.getDefaultSmsPackage(context) == context.packageName
+        if (context.storedRolePosture() == RolePosture.PERMISSIONS_ONLY && !isDefaultSmsApp) {
             return sendSmsWithoutProviderRow(message)
         }
         return try {
@@ -60,18 +71,27 @@ class LocalMessageTransport(private val context: Context) : MessageTransport {
      * through SmsManager directly and writes no provider row. The
      * trade-offs are platform-imposed, not chosen: no sent-copy in
      * the provider for any app to show, and no delivery report,
-     * because both ride on the provider row and its pending intents.
-     * Error codes mirror the default path's, so callers keep their
-     * existing failure handling.
+     * because both ride on the provider row.
+     *
+     * A returned [TransportOutcome.Sent] means the send was queued,
+     * exactly as on the default path: radio and carrier failures
+     * arrive asynchronously, here through the sent PendingIntent to
+     * [PermissionsOnlySendResultReceiver], which surfaces the same
+     * error toast the default path shows. Synchronous error codes
+     * mirror the default path's, so callers keep their existing
+     * failure handling either way.
      */
     @Suppress("TooGenericExceptionCaught")
     private fun sendSmsWithoutProviderRow(message: OutboundSms): TransportOutcome {
-        if (message.addresses.isEmpty()) {
+        // Two contacts can share one number; the persisting path sends
+        // to each distinct destination once, and so does this one.
+        val destinations = message.addresses.toSet()
+        if (destinations.isEmpty()) {
             return TransportOutcome.Failed(TransportOutcome.EMPTY_DESTINATION_ADDRESS)
         }
         return try {
             val smsManager = getSmsManager(message.subscriptionId)
-            for (address in message.addresses) {
+            for (address in destinations) {
                 val destination = PhoneNumberUtils.stripSeparators(address)
                 if (destination.isEmpty()) {
                     return TransportOutcome.Failed(TransportOutcome.EMPTY_DESTINATION_ADDRESS)
@@ -80,18 +100,34 @@ class LocalMessageTransport(private val context: Context) : MessageTransport {
                 if (parts == null || parts.size < 1) {
                     return TransportOutcome.Failed(TransportOutcome.ERROR_SENDING_MESSAGE)
                 }
+                val sentIntent = sentResultIntent(destination)
                 if (parts.size == 1) {
                     @Suppress("DEPRECATION")
-                    smsManager.sendTextMessage(destination, null, message.text, null, null)
+                    smsManager.sendTextMessage(destination, null, message.text, sentIntent, null)
                 } else {
                     @Suppress("DEPRECATION")
-                    smsManager.sendMultipartTextMessage(destination, null, parts, null, null)
+                    smsManager.sendMultipartTextMessage(
+                        destination, null, parts, ArrayList(List(parts.size) { sentIntent }), null
+                    )
                 }
             }
             TransportOutcome.Sent
         } catch (e: Exception) {
             TransportOutcome.Failed(TransportOutcome.UNKNOWN_ERROR, e.message ?: e.toString())
         }
+    }
+
+    /**
+     * One sent-result PendingIntent per destination. The data Uri
+     * makes each intent's identity unique, so concurrent sends never
+     * overwrite each other's result routing.
+     */
+    private fun sentResultIntent(destination: String): PendingIntent {
+        val intent = Intent(context, PermissionsOnlySendResultReceiver::class.java).apply {
+            data = Uri.parse("inkstax-sms://sent-result/$destination/${System.currentTimeMillis()}")
+        }
+        val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        return PendingIntent.getBroadcast(context, 0, intent, flags)
     }
 }
 

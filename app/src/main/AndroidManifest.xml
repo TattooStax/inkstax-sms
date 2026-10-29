@@ -202,6 +202,12 @@
             </intent-filter>
         </receiver>
 
+        <!-- Addressed only by the local binding's explicit sent-result
+             PendingIntents for that same posture -->
+        <receiver
+            android:name=".transport.PermissionsOnlySendResultReceiver"
+            android:exported="false" />
+
         <receiver
             android:name="com.android.mms.transaction.PushReceiver"
             android:exported="true"
