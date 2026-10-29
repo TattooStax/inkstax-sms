@@ -1,4 +1,4 @@
-# :transport — the bridge seam (SMS-1, SMS-2, SMS-3, SMS-4, SMS-5, SMS-6, SMS-7, SMS-8, SMS-9, SMS-10, SMS-11), SMS-12, SMS-14, SMS-15, SMS-18, SMS-19, SMS-20, SMS-21, SMS-22, SMS-26, SMS-27
+# :transport — the bridge seam (SMS-1, SMS-2, SMS-3, SMS-4, SMS-5, SMS-6, SMS-7, SMS-8, SMS-9, SMS-10, SMS-11), SMS-12, SMS-14, SMS-15, SMS-18, SMS-19, SMS-20, SMS-21, SMS-22, SMS-26, SMS-27, SMS-28
 
 Pure Kotlin/JVM module holding the InkStax SMS layer's one
 bridge seam. SMS-1 extracted the outbound side; SMS-2 adds the
@@ -666,3 +666,29 @@ the head through SMS-21's binding, and the caller that holds
 a verdict on a send result, act on this storage in later
 slices.
 
+## Upstream touchpoint registry (SMS-28, ≤5, tagged in code)
+
+None — zero upstream files are modified in this slice.
+Everything in this slice is three new files
+(PendingReportQueueDrain.kt, PendingReportQueueDrainResult.kt,
+and PendingReportQueueGuard.kt in the app-side
+org.fossify.messages.transport package) plus this README.
+The drain caller reports the stored queue SMS-27 persists
+through the outbound ack binding SMS-21 performs, in reached
+order, folding each answer back through the SMS-26 release
+rule and persisting each release before the next report is
+attempted. Only the brain recording a report releases a head;
+the first result that is not a recording stops the drain with
+the head and everything behind it still pending in order, and
+a recording whose release cannot be persisted reports its own
+outcome, because the report stays pending for a re-report
+against the same source id. Each report carries the time the
+phone reached its verdict, as stored — the drain takes no
+report time of its own, so a re-report never rewrites when a
+verdict was reached. Every read-modify-write of the stored
+queue runs under one process-wide guard, with a drain's
+network call outside it, so a hold landing while a report is
+in flight is neither lost under that report's release nor
+overtaken. SMS-28 wires no trigger of its own — the caller
+that holds a verdict on a send result, and any scheduled
+retry of a blocked drain, act on this caller in later slices.
