@@ -1,6 +1,7 @@
 package org.fossify.messages.transport
 
 import android.content.Context
+import inkstax.sms.transport.DeviceCredential
 import inkstax.sms.transport.InboundDeliveryOutcome
 import inkstax.sms.transport.InboundDisposition
 import inkstax.sms.transport.InboundSms
@@ -74,7 +75,6 @@ sealed interface InboundDeliveryBindingResult {
  * the ack is defined to carry no body, so the status alone
  * decides.
  */
-@Suppress("SwallowedException")
 fun Context.performInboundDelivery(
     message: InboundSms,
     handedOffAtMillis: Long
@@ -83,6 +83,26 @@ fun Context.performInboundDelivery(
     require(handedOffAtMillis >= 0L) { "handedOffAtMillis must not be negative" }
     val credential = storedDeviceCredential()
         ?: return InboundDeliveryBindingResult.NoUsableCredential
+    return performInboundDelivery(credential, message, handedOffAtMillis)
+}
+
+/**
+ * The same delivery performed with a credential the caller
+ * already holds: a caller that read work under a pairing —
+ * the held inbound drain reading its queue under the stored
+ * credential — delivers with that pairing's credential, never
+ * one a disconnect and re-pair may have stored since, so a
+ * message taken in under one pairing is only ever sent to
+ * that pairing's endpoint.
+ */
+@Suppress("SwallowedException")
+internal fun Context.performInboundDelivery(
+    credential: DeviceCredential,
+    message: InboundSms,
+    handedOffAtMillis: Long
+): InboundDeliveryBindingResult {
+    require(message.receivedAtMillis >= 0L) { "receivedAtMillis must not be negative" }
+    require(handedOffAtMillis >= 0L) { "handedOffAtMillis must not be negative" }
     if (inboundDispositionFor(message).disposition != InboundDisposition.HANDLED ||
         message.sourceId == null
     ) {

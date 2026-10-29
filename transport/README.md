@@ -835,3 +835,31 @@ disconnect and re-pair, so one pairing's messages are
 never stamped with the next pairing's identity. The
 inbound drain's own snapshot and release taking the
 same guard remains a separate hardening candidate.
+
+## Upstream touchpoint registry (SMS-33, ≤5, tagged in code)
+
+None — zero upstream files are modified in this slice.
+Everything in this slice is changes to this track's own files
+in the app-side org.fossify.messages.transport package
+(HeldQueueDrain.kt, InboundDeliveryBinding.kt, and a doc-only
+change to CredentialGuard.kt), plus this README. The held
+inbound drain now takes the credential guard the way the
+pending outbound report drain already does. Each attempt
+captures the credential and the queue under the credential
+guard as one snapshot and delivers with that credential —
+the delivery binding gained a credential-taking overload
+for this, with its existing entry point delegating — so a
+disconnect and re-pair landing while a delivery is in
+flight never reroutes a message taken in under one pairing
+to the next pairing's endpoint. The release re-checks the
+pairing inside both guards, in the one lock order, before
+it folds anything: a pairing that changed mid-delivery
+leaves the stored queue, which belongs to the new pairing,
+untouched, and the drain moves on to whatever the current
+pairing holds. A blocked drain also reports its remaining
+count from a read-back under the queue guard at the stop,
+so an arrival held while the delivery was in flight still
+counts. Before this slice the drain read its queue and
+released it under the queue guard alone while the binding
+reloaded the credential on its own, so the pairing race the
+outbound drain's closure removed stayed latent here.
