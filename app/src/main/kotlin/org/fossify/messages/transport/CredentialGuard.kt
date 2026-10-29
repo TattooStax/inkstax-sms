@@ -6,10 +6,11 @@ package org.fossify.messages.transport
  * credential (the only mutations, both in CredentialStorage)
  * runs under this lock, and a caller that captures a
  * credential together with state belonging to that pairing —
- * the pending report drain capturing its queue snapshot, and
- * checking its pairing again at release — holds the same
- * lock, so the pairing it captured cannot change inside its
- * guarded section. Without one order between them, a
+ * the verdict caller checking its credential as it holds a
+ * report, the pending report drain capturing its queue
+ * snapshot and checking its pairing again at release — holds
+ * the same lock, so the pairing it captured cannot change
+ * inside its guarded section. Without one order between them, a
  * disconnect and re-pair landing between a snapshot and its
  * release could stamp one pairing's queued work with the
  * next pairing's identity and send it to the wrong endpoint.
