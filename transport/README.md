@@ -39,7 +39,9 @@ inbound side with its local binding first.
   The token's percent escapes are read as ASCII hex only
   (SMS-12): a non-ASCII digit spelling is malformed, never a
   different byte, and the decoder checks that itself instead of
-  relying on the URI parse in front of it.
+  relying on the URI parse in front of it. The fallback code's
+  format is likewise ASCII digits only: the brain issues codes
+  in ASCII, so another script's digits are no code it issued.
   Pure definitions only: no scanner, no network exchange, and no
   credential storage lives here — a binding supplies the scanned
   text and exchange outcomes and acts on the states.
