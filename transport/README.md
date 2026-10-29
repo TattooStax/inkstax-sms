@@ -736,3 +736,38 @@ bridge source id for a reply today, and choosing an identity
 for local sends is the brain-dispatched send path's own
 slice. A scheduled retry of a blocked drain remains a later
 caller slice.
+
+## Upstream touchpoint registry (SMS-30, \u22645, tagged in code)
+
+One tagged touchpoint — SettingsActivity re-arms the scheduled
+drain retry on a visit, beside the heartbeat re-arm it already
+performs (SMS-30-TOUCHPOINT 1/1). Everything else in this slice
+is new files (DrainRetry.kt and its test in :transport,
+DrainRetrySchedule.kt in the app-side
+org.fossify.messages.transport package) and changes to this
+track's own files (the pairing, disconnect, boot, heartbeat,
+and drain-worker files), plus this README.
+The scheduled retry trigger retries a blocked drain without
+waiting for a new arrival or verdict: while the phone is
+paired, periodic lifecycle-managed work runs both existing
+drain workers at the drain-retry interval the :transport
+definitions set — the heartbeat interval — under the network
+constraint the drains require. The retry introduces no third
+drain and no second queue path; a periodic run is the same
+drain, under the same guards and release rules, attempted
+again. Pairing and a completed boot and every Settings visit
+ensure the schedule (kept, not replaced, so a visit does not
+push the next retry later), disconnect cancels it, and a
+heartbeat path that finds no usable credential cancels it as
+it cancels the heartbeat schedule. A drain of an empty queue
+is a defined no-op, so a paired phone with nothing held pays
+one empty read per queue per interval.
+
+Both drain workers run their drain under a per-queue execution
+guard (DrainExecutionGuard.kt, added with this slice): periodic
+work has its own unique names, outside the appended one-time
+chains, so without it a retry and a caller-triggered drain of
+the same queue could run at once and send the same head twice.
+The guard is held across the whole drain, network calls
+included; the storage guards remain held only around storage
+updates, inside it.

@@ -76,6 +76,7 @@ private fun Activity.disconnectPairing(onDisconnected: () -> Unit) {
                     // No credential remains, so the heartbeat
                     // service has nothing to beat with and stops.
                     stopHeartbeatService()
+                    cancelDrainRetrySchedule()
                     toast(R.string.pairing_disconnected)
                     onDisconnected()
                 } else {

@@ -54,6 +54,7 @@ class HeartbeatBootReceiver : BroadcastReceiver() {
         }
         context.postHeartbeatNotification(HeartbeatNotificationState.STARTING)
         context.scheduleNextHeartbeat(nextHeartbeatDelayMillis(isFirstBeat = false))
+        context.ensureDrainRetrySchedule()
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM &&
             context.tryStartHeartbeatBeatService()
         ) {

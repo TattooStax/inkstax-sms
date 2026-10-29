@@ -16,8 +16,9 @@ import androidx.work.WorkerParameters
  * leaves the unacked entries held in order, and retrying from
  * here cannot fix the outcomes that block a drain — a rejected
  * credential needs re-pairing, and an unreachable endpoint is
- * retried by the next arrival's enqueue (and by the network
- * constraint on any work still pending). The work therefore
+ * retried by the next arrival's enqueue, by the scheduled
+ * drain retry, and by the network constraint on any work
+ * still pending. The work therefore
  * reports success once its one drain attempt has run, whatever
  * the drain's own result was.
  */
@@ -27,7 +28,13 @@ class HeldDrainWorker(
 ) : Worker(context, params) {
 
     override fun doWork(): Result {
-        applicationContext.drainHeldInboundQueue(System.currentTimeMillis())
+        // Every trigger of this drain runs under the queue's
+        // execution guard, so a scheduled retry and an
+        // arrival-triggered drain never deliver the same head
+        // at once (see DrainExecutionGuard).
+        synchronized(DrainExecutionGuard.heldInboundLock) {
+            applicationContext.drainHeldInboundQueue(System.currentTimeMillis())
+        }
         return Result.success()
     }
 }

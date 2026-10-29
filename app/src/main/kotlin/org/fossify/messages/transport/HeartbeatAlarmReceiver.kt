@@ -38,6 +38,7 @@ class HeartbeatAlarmReceiver : BroadcastReceiver() {
         if (context.storedDeviceCredential() == null) {
             context.cancelHeartbeatSchedule()
             context.cancelHeartbeatNotification()
+            context.cancelDrainRetrySchedule()
             return
         }
         context.scheduleNextHeartbeat(nextHeartbeatDelayMillis(isFirstBeat = false))
