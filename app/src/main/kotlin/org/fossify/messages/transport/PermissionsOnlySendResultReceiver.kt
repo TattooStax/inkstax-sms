@@ -5,6 +5,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import org.fossify.messages.extensions.messagingUtils
+import org.fossify.messages.helpers.refreshConversations
+import org.fossify.messages.helpers.refreshMessages
 import org.fossify.messages.receivers.SendStatusReceiver
 
 /**
@@ -22,6 +24,12 @@ import org.fossify.messages.receivers.SendStatusReceiver
 class PermissionsOnlySendResultReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
+        // Completion is when an open conversation can pick the send up:
+        // the composer already re-queried once, before the send finished.
+        // Posting the same refresh events the default path posts lets the
+        // screen reload now that the outcome is known.
+        refreshMessages()
+        refreshConversations()
         if (resultCode == Activity.RESULT_OK) return
         context.messagingUtils.maybeShowErrorToast(
             resultCode = resultCode,
