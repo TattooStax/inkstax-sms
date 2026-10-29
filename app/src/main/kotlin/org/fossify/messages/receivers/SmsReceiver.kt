@@ -159,7 +159,10 @@ class SmsReceiver : BroadcastReceiver() {
         LocalInboundSink().onInbound(
             InboundSms(
                 sender = address, body = body, receivedAtMillis = date,
-                subscriptionId = subscriptionId, providerId = newMessageId, threadId = threadId
+                subscriptionId = subscriptionId,
+                // insertNewSMS returns 0L when the provider insert failed; that sentinel
+                // is not a provider row, so the seam must see an unknown id, not "sms:0".
+                providerId = newMessageId.takeIf { it != 0L }, threadId = threadId
             )
         )
     }
