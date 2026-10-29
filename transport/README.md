@@ -771,3 +771,39 @@ the same queue could run at once and send the same head twice.
 The guard is held across the whole drain, network calls
 included; the storage guards remain held only around storage
 updates, inside it.
+
+## Default-SMS role qualification (SMS-30P)
+
+The endgame test needs this app selectable as a phone's default
+SMS app. Android offers that role only to an app whose manifest
+declares four components with exact shapes: an activity handling
+SENDTO (category DEFAULT, scheme smsto), a service gated by
+SEND_RESPOND_VIA_MESSAGE handling RESPOND_VIA_MESSAGE (DEFAULT,
+smsto), a receiver gated by BROADCAST_SMS handling SMS_DELIVER,
+and a receiver gated by BROADCAST_WAP_PUSH handling
+WAP_PUSH_DELIVER typed application/vnd.wap.mms-message. A build
+missing any one of them still installs and runs; the system
+picker just never offers it, so the loss stays invisible until
+someone is standing at a phone trying to select the app.
+
+`scripts/verify_sms_role_qualification.py` checks a build for
+the full surface: it parses the merged manifest structurally —
+one enabled, exported component of the right kind per
+requirement, with the right permission, action, category,
+scheme, and MIME type — and, when given the APK as a second
+argument, confirms every required literal survived packaging
+(read through aapt2). Run it after assembleFossDebug against
+the merged manifest and the APK the build produced.
+
+Audit result: this repo's build carries the full surface. The
+four components are upstream Fossify declarations in
+`app/src/main/AndroidManifest.xml`, and none of this track's
+manifest touchpoints alters them. The build that failed the
+on-device picker check (package app.tattoostax.sms, version
+1.13.1-stax-v2) is not built from this repo — this repo builds
+org.fossify.messages, version 1.10.2 — so the on-device proof
+must install this track's build, and this check is what stands
+guard over that install: its failures are proven against
+manifests with each requirement stripped in turn, so a future
+merge or repackaging that drops a declaration fails here
+instead of at a phone.
