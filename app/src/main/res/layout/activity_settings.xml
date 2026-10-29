@@ -158,6 +158,22 @@
 
             </RelativeLayout>
 
+            <!-- SMS-10-TOUCHPOINT 3/4: the pairing scanner entry in Settings -->
+            <RelativeLayout
+                android:id="@+id/settings_pair_companion_holder"
+                style="@style/SettingsHolderTextViewOneLinerStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <org.fossify.commons.views.MyTextView
+                    android:id="@+id/settings_pair_companion"
+                    style="@style/SettingsTextLabelStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/pair_companion" />
+
+            </RelativeLayout>
+
             <RelativeLayout
                 android:id="@+id/settings_font_size_holder"
                 style="@style/SettingsHolderTextViewStyle"

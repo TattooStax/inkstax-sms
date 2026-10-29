@@ -1,4 +1,4 @@
-# :transport — the bridge seam (SMS-1, SMS-2, SMS-3, SMS-4, SMS-5, SMS-6, SMS-7, SMS-8, SMS-9)
+# :transport — the bridge seam (SMS-1, SMS-2, SMS-3, SMS-4, SMS-5, SMS-6, SMS-7, SMS-8, SMS-9, SMS-10)
 
 Pure Kotlin/JVM module holding the InkStax SMS layer's one
 bridge seam. SMS-1 extracted the outbound side; SMS-2 adds the
@@ -85,7 +85,8 @@ inbound side with its local binding first.
   material lives here. SMS-4 defines the ack/heartbeat *states*
   every binding shares, but no binding sends a heartbeat or an
   ack yet. SMS-5 defines the pairing payload and token *states*,
-  but no scanner reads a QR yet. The local binding is
+  and the scanner that reads a QR lives app-side (SMS-10).
+  The local binding is
   in-process; host/cloud bindings stay design-intent until their
   own slices open.
 - **No second intake, store, or scheduler.** Receivers persist
@@ -103,7 +104,16 @@ persistence/sending code, error codes unchanged) and
 `LocalInboundSink` (inbound, applies the shared disposition
 rule after local persistence). `PairingExchangeBinding.kt`
 performs the pairing exchange over HTTPS and stores the minted
-credential through `CredentialStorage.kt`.
+credential through `CredentialStorage.kt`. `PairingSetup.kt`
+(SMS-10) is the exchange binding's caller: an embedded ZXing
+scanner (Apache-2.0, no GMS) launched from Settings reads a QR,
+only a payload `pairingOfferFromQrPayload` accepts starts an
+exchange, and a minted-but-unstored credential is retried
+through the storage once from the credential the result carries.
+A phone that already holds a credential pairs nothing new
+(PAIRED is terminal; re-pairing is a disconnect first), and a
+process-wide single-flight guard covers the paired check, the
+exchange, and the storage retry together.
 
 ## Upstream touchpoint registry (SMS-1, ≤5, tagged in code)
 
@@ -187,6 +197,30 @@ pairing whose single-use token is already spent. A transport
 fault reads as no answer (unreachable), so the attempt stays
 open for a retry inside the token's lifetime. No scanner reads a
 QR yet — the scanner UI acts on this binding in a later slice.
+
+## Upstream touchpoint registry (SMS-10, ≤5, tagged in code)
+
+| # | File | Change |
+|---|------|--------|
+| 1 | `app/build.gradle.kts` | Adds the embedded ZXing scanner dependency (pinned `com.journeyapps:zxing-android-embedded:4.3.0`, Apache-2.0, no GMS) |
+| 2 | `app/src/main/res/values/strings.xml` | The pairing entry label, scan prompt, and outcome messages |
+| 3 | `app/src/main/res/layout/activity_settings.xml` | The "Pair with your business system" row in Settings |
+| 4 | `app/src/main/kotlin/org/fossify/messages/activities/SettingsActivity.kt` | Registers the scanner launcher and wires the Settings row to launch it |
+
+Everything else in this slice is one new file
+(`PairingSetup.kt` in the app-side
+`org.fossify.messages.transport` package) plus this README. The
+scanner is the exchange binding's first caller: a scanned
+payload starts an exchange only when it reads as a pairing
+offer, a cancelled scan does nothing, and every exchange
+outcome is reported in the definitions' failure vocabulary.
+An already-paired phone refuses a new offer before any
+exchange runs, and one attempt runs at a time under a
+process-wide guard.
+The library's own manifest supplies the camera permission and
+its capture activity, so this slice adds no manifest entry.
+Still not claimed: the download/App-Link serving of the QR is
+brain-side work, and no binding sends a heartbeat or an ack yet.
 
 SMS-3 note: the dedicated posture keeps the upstream startup flow
 unchanged (default role requested, declining it exits). The

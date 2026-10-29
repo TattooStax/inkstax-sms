@@ -8,6 +8,17 @@
     <string name="posture_question">Is this phone dedicated to the business line?</string>
     <string name="posture_dedicated">Yes — dedicated business phone</string>
     <string name="posture_personal">No — my personal phone</string>
+    <!-- SMS-10-TOUCHPOINT 2/4: the pairing scanner entry and its outcome messages -->
+    <string name="pair_companion">Pair with your business system</string>
+    <string name="pairing_scan_prompt">Point the camera at the pairing code</string>
+    <string name="pairing_qr_not_recognized">That code is not a pairing code</string>
+    <string name="pairing_in_progress">Pairing…</string>
+    <string name="pairing_already_paired">This phone is already paired</string>
+    <string name="pairing_succeeded">This phone is paired</string>
+    <string name="pairing_storage_failed">Pairing worked, but saving it on this phone failed. Scan a fresh code to try again.</string>
+    <string name="pairing_token_lapsed">That pairing code has expired or already been used. Get a fresh code and scan again.</string>
+    <string name="pairing_unreachable">Could not reach the pairing system. Check the connection and scan again.</string>
+    <string name="pairing_failed">Pairing failed. Get a fresh code and scan again.</string>
     <string name="delete_conversation_requires_default_messenger">This app is not your default messaging app, so it cannot delete conversations. Delete this conversation in your default messenger instead.</string>
     <string name="message_not_sent_touch_retry">Not sent. Touch to retry.</string>
     <string name="message_sending_error">Your message to \'%s\' has not been sent</string>
