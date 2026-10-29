@@ -140,6 +140,8 @@ detekt {
 }
 
 dependencies {
+    // SMS-1-TOUCHPOINT 3/5: the app binds the :transport seam locally (see transport/README.md)
+    implementation(project(":transport"))
     implementation(libs.fossify.commons)
     implementation(libs.eventbus)
     implementation(libs.indicator.fast.scroll)
