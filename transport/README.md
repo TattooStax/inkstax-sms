@@ -825,7 +825,13 @@ arrival unheld, so a later caller in the same process
 finds exactly the queue that was durably held before the
 arrival, and no drain is enqueued for an undurable hold.
 A successful store keeps the previous behaviour: the
-arrival reads back held and its drain is enqueued. This
-slice changes no other caller: the inbound drain's
-credential-guard closure remains a separate hardening
-candidate.
+arrival reads back held and its drain is enqueued. The
+hold also runs under the credential guard, outside the
+queue guard and in the one order every caller uses,
+because storing the queue stamps it with the pairing
+that held it: the credential check, the store, and a
+failed store's write-back are atomic against a
+disconnect and re-pair, so one pairing's messages are
+never stamped with the next pairing's identity. The
+inbound drain's own snapshot and release taking the
+same guard remains a separate hardening candidate.

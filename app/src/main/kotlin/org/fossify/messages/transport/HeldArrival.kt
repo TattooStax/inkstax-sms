@@ -47,6 +47,16 @@ private const val HELD_DRAIN_WORK_NAME = "held_inbound_drain"
  * the held queue storage), so a later pairing never drains
  * this pairing's messages under its own credential.
  *
+ * The hold runs under the credential guard, outside the
+ * queue guard and in the one order every caller uses:
+ * storing the queue stamps it with the pairing that held
+ * it, so the credential check, the store, and a failed
+ * store's write-back must be atomic against a disconnect
+ * and re-pair — a pairing change landing between them
+ * would stamp this pairing's messages with the next
+ * pairing's identity, and a later drain would deliver
+ * them to the wrong endpoint.
+ *
  * A hold counts only when its store reports durable: a
  * failed commit can still leave the in-memory preferences
  * holding the new queue, so a read-back alone would report
@@ -64,17 +74,19 @@ private const val HELD_DRAIN_WORK_NAME = "held_inbound_drain"
  */
 fun Context.holdAndDrainInboundArrival(message: InboundSms): Boolean {
     val held = heldInboundMessageFor(message) ?: return false
-    val isHeld = synchronized(HeldQueueGuard.lock) {
-        if (storedDeviceCredential() == null) {
-            false
-        } else {
-            val before = storedHeldInboundQueue()
-            val stored = storeHeldInboundQueue(heldQueueAfterArrival(before, message))
-            if (stored) {
-                storedHeldInboundQueue().any { it.sourceId == held.sourceId }
-            } else {
-                storeHeldInboundQueue(before)
+    val isHeld = synchronized(CredentialGuard.lock) {
+        synchronized(HeldQueueGuard.lock) {
+            if (storedDeviceCredential() == null) {
                 false
+            } else {
+                val before = storedHeldInboundQueue()
+                val stored = storeHeldInboundQueue(heldQueueAfterArrival(before, message))
+                if (stored) {
+                    storedHeldInboundQueue().any { it.sourceId == held.sourceId }
+                } else {
+                    storeHeldInboundQueue(before)
+                    false
+                }
             }
         }
     }
