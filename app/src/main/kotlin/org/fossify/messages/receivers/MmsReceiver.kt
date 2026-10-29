@@ -107,7 +107,7 @@ class MmsReceiver : MmsReceivedReceiver() {
         // SMS-2-TOUCHPOINT 2/2: MMS arrivals pass through the seam so V1 classifies them
         // NOT_FORWARDED instead of silently dropping them; media stays in the provider store.
         val inboundOutcome = LocalInboundSink().onInbound(inbound)
-        // SMS-25-TOUCHPOINT 3/3: every arrival passes through the arrival caller, and
+        // SMS-25-TOUCHPOINT 3/4: every arrival passes through the arrival caller, and
         // the caller's holding rule is what keeps an MMS arrival unheld — V1 does not
         // forward MMS, so this call holds nothing and drains nothing for it.
         context.holdAndDrainInboundArrival(inbound)

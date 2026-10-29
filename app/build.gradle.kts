@@ -153,6 +153,9 @@ dependencies {
     implementation(libs.ez.vcard)
     // SMS-10-TOUCHPOINT 1/4: the pairing scanner's embedded QR reader (ZXing, Apache-2.0, no GMS)
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+    // SMS-25-TOUCHPOINT 4/4: the arrival caller hands the held-queue drain to
+    // lifecycle-managed work (WorkManager 2.10.5, Apache-2.0, no GMS)
+    implementation("androidx.work:work-runtime:2.10.5")
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.bundles.room)
     ksp(libs.androidx.room.compiler)

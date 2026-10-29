@@ -71,7 +71,7 @@ class SmsReceivedReceiver : BroadcastReceiver() {
                     subscriptionId = intent.getIntExtra("subscription", -1)
                 )
                 LocalInboundSink().onInbound(inbound)
-                // SMS-25-TOUCHPOINT 2/3: the arrival caller runs on this receiver's
+                // SMS-25-TOUCHPOINT 2/4: the arrival caller runs on this receiver's
                 // background thread too. This path writes no provider row, so its
                 // arrivals carry no source id and the caller holds none of them —
                 // a held delivery needs an identity the brain can ack against.

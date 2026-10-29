@@ -18,6 +18,8 @@ private const val HELD_PROVIDER_ID_PREFIX = "held_inbound_provider_id_"
 private const val HELD_PROVIDER_PRESENT_PREFIX = "held_inbound_provider_present_"
 private const val HELD_THREAD_ID_PREFIX = "held_inbound_thread_id_"
 private const val HELD_THREAD_PRESENT_PREFIX = "held_inbound_thread_present_"
+private const val HELD_PAIRING_ENDPOINT = "held_inbound_pairing_endpoint"
+private const val HELD_PAIRING_DEVICE = "held_inbound_pairing_device"
 
 /**
  * The held inbound queue, read back through the :transport rules:
@@ -33,9 +35,27 @@ private const val HELD_THREAD_PRESENT_PREFIX = "held_inbound_thread_present_"
  * process: a held message is one the phone owes the brain an
  * ack-released delivery for, and losing it with the process
  * would lose a message the sender already sent.
+ *
+ * The queue is bound to the pairing that held it: the stored
+ * pairing identity (the credential's endpoint and device id,
+ * written beside the queue in the same commit) must name this
+ * device's current credential for the queue to read back at
+ * all. Held messages were taken in for one endpoint, senders
+ * and bodies included; under a different pairing they would be
+ * delivered to an endpoint they were never sent to, and with
+ * no usable credential there is no pairing to deliver for — so
+ * a queue stored under another pairing, or under none that can
+ * still be named, reads as empty, and the next store under the
+ * current pairing replaces it wholesale.
  */
 fun Context.storedHeldInboundQueue(): List<HeldInboundMessage> {
+    val credential = storedDeviceCredential() ?: return emptyList()
     val prefs = getSharedPrefs()
+    if (prefs.getString(HELD_PAIRING_ENDPOINT, null) != credential.endpointBase ||
+        prefs.getString(HELD_PAIRING_DEVICE, null) != credential.deviceId
+    ) {
+        return emptyList()
+    }
     val count = prefs.getInt(HELD_QUEUE_COUNT, 0)
     var queue: List<HeldInboundMessage> = emptyList()
     for (index in 0 until count) {
@@ -71,6 +91,20 @@ fun Context.storeHeldInboundQueue(queue: List<HeldInboundMessage>): Boolean {
     val prefs = getSharedPrefs()
     val previousCount = prefs.getInt(HELD_QUEUE_COUNT, 0)
     val editor = prefs.edit()
+    // The pairing identity travels in the same commit as the
+    // queue it binds, so a queue and the pairing it belongs to
+    // can never be stored apart: with a usable credential the
+    // identity is that credential, and without one the identity
+    // is removed, because a queue no current pairing can name
+    // must not become deliverable under a later pairing.
+    val credential = storedDeviceCredential()
+    if (credential != null) {
+        editor.putString(HELD_PAIRING_ENDPOINT, credential.endpointBase)
+        editor.putString(HELD_PAIRING_DEVICE, credential.deviceId)
+    } else {
+        editor.remove(HELD_PAIRING_ENDPOINT)
+        editor.remove(HELD_PAIRING_DEVICE)
+    }
     editor.putInt(HELD_QUEUE_COUNT, normalized.size)
     normalized.forEachIndexed { index, held -> editor.putHeldMessage(index, held.message) }
     for (index in normalized.size until previousCount) {
