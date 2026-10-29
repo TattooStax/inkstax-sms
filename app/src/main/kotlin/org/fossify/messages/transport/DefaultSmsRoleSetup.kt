@@ -24,6 +24,10 @@ import inkstax.sms.transport.defaultSmsRoleStep
  * system's default-apps screen opened directly by this flow
  * where the role is unavailable — setup has no dead end.
  *
+ * The role system exists only on Android 10 (API 29) and later,
+ * so every read of it happens inside a level check the platform
+ * tools can see, and the step definitions receive plain facts.
+ *
  * The result returns under the caller's request code. A screen
  * opened this way does not report its outcome the same way on
  * every path — the default-apps screen in particular returns
@@ -32,24 +36,28 @@ import inkstax.sms.transport.defaultSmsRoleStep
  * [isDefaultSmsApp] back, never by the result code alone.
  */
 fun Activity.launchDefaultSmsRoleSetup(requestCode: Int, onAlreadyDefault: () -> Unit) {
-    val roleManager = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-        getSystemService(RoleManager::class.java)
-    } else {
-        null
+    var roleAvailable = false
+    var roleHeld = false
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        val roleManager = getSystemService(RoleManager::class.java)
+        roleAvailable = roleManager?.isRoleAvailable(RoleManager.ROLE_SMS) == true
+        roleHeld = roleManager?.isRoleHeld(RoleManager.ROLE_SMS) == true
     }
     val step = defaultSmsRoleStep(
         apiLevel = Build.VERSION.SDK_INT,
-        roleAvailable = roleManager?.isRoleAvailable(RoleManager.ROLE_SMS) == true,
-        roleHeld = roleManager?.isRoleHeld(RoleManager.ROLE_SMS) == true,
+        roleAvailable = roleAvailable,
+        roleHeld = roleHeld,
         isDefaultSmsPackage = Telephony.Sms.getDefaultSmsPackage(this) == packageName
     )
     when (step) {
         DefaultSmsRoleStep.ALREADY_DEFAULT -> onAlreadyDefault()
         DefaultSmsRoleStep.REQUEST_ROLE -> {
-            val intent = checkNotNull(roleManager) {
-                "The role step was chosen, so the role system answered"
-            }.createRequestRoleIntent(RoleManager.ROLE_SMS)
-            startActivityForResult(intent, requestCode)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val roleManager = checkNotNull(getSystemService(RoleManager::class.java)) {
+                    "The role step was chosen, so the role system answered"
+                }
+                startActivityForResult(roleManager.createRequestRoleIntent(RoleManager.ROLE_SMS), requestCode)
+            }
         }
         DefaultSmsRoleStep.CHANGE_DEFAULT -> {
             val intent = Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT)
