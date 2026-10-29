@@ -16,8 +16,9 @@ The merged manifest is checked structurally: each requirement must
 be met by one enabled, exported component of the right kind,
 carrying the right permission, action, category, scheme, and MIME
 type. When an APK is also given, its binary manifest (read through
-aapt2) must contain every required literal, confirming the surface
-survived packaging into the artifact that would be installed.
+aapt2) must contain every required value in full, confirming the
+surface survived packaging into the artifact that would be
+installed.
 
 Exit code 0 means every requirement is present; 1 lists each
 requirement that is missing.
@@ -44,7 +45,17 @@ MMS_MIME_TYPE = "application/vnd.wap.mms-message"
 
 
 def intent_filters(component):
-    """Yield (actions, categories, schemes, mime_types) per intent-filter."""
+    """Yield the match-relevant shape of each intent-filter.
+
+    The platform qualifies a component by resolving a fixed intent
+    against its filters: the intent carries a category and, depending
+    on the component, a scheme or a MIME type, but never a host, a
+    path, or (for the untyped intents) a type. A filter that adds
+    such a constraint therefore never matches the qualification
+    intent, so the filter's data shape is reported whole — schemes,
+    MIME types, and whether any data element pins a host or a path —
+    and each requirement below states the exact shape it accepts.
+    """
     for intent_filter in component.findall("intent-filter"):
         actions = {
             el.get(ANDROID + "name") for el in intent_filter.findall("action")
@@ -54,6 +65,7 @@ def intent_filters(component):
         }
         schemes = set()
         mime_types = set()
+        pins_location = False
         for data in intent_filter.findall("data"):
             scheme = data.get(ANDROID + "scheme")
             if scheme:
@@ -61,7 +73,12 @@ def intent_filters(component):
             mime_type = data.get(ANDROID + "mimeType")
             if mime_type:
                 mime_types.add(mime_type)
-        yield actions, categories, schemes, mime_types
+            if any(
+                data.get(ANDROID + attr)
+                for attr in ("host", "port", "path", "pathPrefix", "pathPattern")
+            ):
+                pins_location = True
+        yield actions, categories, schemes, mime_types, pins_location
 
 
 def usable(component):
@@ -81,6 +98,10 @@ def check_manifest(path):
     application = ET.parse(path).getroot().find("application")
     if application is None:
         return ["manifest has no <application> element"]
+    # A disabled application disables every component inside it,
+    # whatever each component's own attributes say.
+    if application.get(ANDROID + "enabled") == "false":
+        return ["the application itself is disabled"]
 
     def components(kind):
         return [el for el in application.findall(kind) if usable(el)]
@@ -88,22 +109,22 @@ def check_manifest(path):
     unmet = []
 
     # The user must be able to compose a message to a number through
-    # the platform's standard send-to intent.
+    # the platform's standard send-to intent, which is untyped and
+    # hostless, so the qualifying filter may pin nothing beyond the
+    # scheme.
+    def sendto_filter(f):
+        return (
+            SENDTO in f[0]
+            and DEFAULT_CATEGORY in f[1]
+            and SMSTO_SCHEME in f[2]
+            and not f[3]
+            and not f[4]
+        )
+
     if not any(
-        any_filter(
-            activity,
-            lambda f: SENDTO in f[0]
-            and DEFAULT_CATEGORY in f[1]
-            and SMSTO_SCHEME in f[2],
-        )
-        for activity in components("activity")
+        any_filter(activity, sendto_filter) for activity in components("activity")
     ) and not any(
-        any_filter(
-            alias,
-            lambda f: SENDTO in f[0]
-            and DEFAULT_CATEGORY in f[1]
-            and SMSTO_SCHEME in f[2],
-        )
+        any_filter(alias, sendto_filter)
         for alias in components("activity-alias")
     ):
         unmet.append(
@@ -112,14 +133,17 @@ def check_manifest(path):
 
     # The phone app must be able to hand the app a respond-via-message
     # request during a call, through a service only the system can
-    # invoke for that purpose.
+    # invoke for that purpose. That intent is likewise untyped and
+    # hostless.
     if not any(
         service.get(ANDROID + "permission") == SEND_RESPOND_PERMISSION
         and any_filter(
             service,
             lambda f: RESPOND_VIA_MESSAGE in f[0]
             and DEFAULT_CATEGORY in f[1]
-            and SMSTO_SCHEME in f[2],
+            and SMSTO_SCHEME in f[2]
+            and not f[3]
+            and not f[4],
         )
         for service in components("service")
     ):
@@ -129,10 +153,14 @@ def check_manifest(path):
         )
 
     # Inbound SMS is delivered only to the default app, through a
-    # receiver only the system can trigger.
+    # receiver only the system can trigger. The delivery intent
+    # carries no data, so the qualifying filter declares none.
     if not any(
         receiver.get(ANDROID + "permission") == BROADCAST_SMS_PERMISSION
-        and any_filter(receiver, lambda f: SMS_DELIVER in f[0])
+        and any_filter(
+            receiver,
+            lambda f: SMS_DELIVER in f[0] and not f[2] and not f[3] and not f[4],
+        )
         for receiver in components("receiver")
     ):
         unmet.append(
@@ -140,12 +168,17 @@ def check_manifest(path):
         )
 
     # Inbound MMS arrives as a WAP push, through a receiver only the
-    # system can trigger, typed as an MMS message.
+    # system can trigger, typed as an MMS message. The push intent
+    # carries a type but no URI, so the qualifying filter pins no
+    # scheme or location.
     if not any(
         receiver.get(ANDROID + "permission") == BROADCAST_WAP_PUSH_PERMISSION
         and any_filter(
             receiver,
-            lambda f: WAP_PUSH_DELIVER in f[0] and MMS_MIME_TYPE in f[3],
+            lambda f: WAP_PUSH_DELIVER in f[0]
+            and MMS_MIME_TYPE in f[3]
+            and not f[2]
+            and not f[4],
         )
         for receiver in components("receiver")
     ):
@@ -159,6 +192,7 @@ def check_manifest(path):
 
 REQUIRED_APK_LITERALS = [
     SENDTO,
+    DEFAULT_CATEGORY,
     SMSTO_SCHEME,
     RESPOND_VIA_MESSAGE,
     SEND_RESPOND_PERMISSION,
@@ -197,10 +231,14 @@ def check_apk(path):
     )
     if result.returncode != 0:
         return [f"aapt2 could not read the APK manifest: {result.stderr.strip()}"]
+    # Attribute values render quoted in the dump; matching the quoted
+    # value keeps a renamed string that merely contains a required
+    # literal (an action with a suffix added, say) from satisfying
+    # the check.
     return [
         f"APK manifest is missing {literal}"
         for literal in REQUIRED_APK_LITERALS
-        if literal not in result.stdout
+        if f'"{literal}"' not in result.stdout
     ]
 
 
