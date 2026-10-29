@@ -80,6 +80,15 @@ class LocalMessageTransport(private val context: Context) : MessageTransport {
      * error toast the default path shows. Synchronous error codes
      * mirror the default path's, so callers keep their existing
      * failure handling either way.
+     *
+     * One known gap, recorded rather than papered over: a
+     * multi-recipient SMS shows in each recipient's own thread, but
+     * not in the combined group conversation — the persisting path
+     * manufactures that combined copy with a provider insert this
+     * posture cannot make, and the only alternative is a second
+     * message store, which this fork does not grow. How the personal
+     * posture should present group sends is an open design question
+     * on the track queue.
      */
     @Suppress("TooGenericExceptionCaught")
     private fun sendSmsWithoutProviderRow(message: OutboundSms): TransportOutcome {
