@@ -2,12 +2,17 @@ package org.fossify.messages.receivers
 
 import android.content.Context
 import android.net.Uri
+import android.widget.Toast
 import com.bumptech.glide.Glide
 import com.klinker.android.send_message.MmsReceivedReceiver
+import inkstax.sms.transport.InboundDisposition
+import inkstax.sms.transport.InboundKind
+import inkstax.sms.transport.InboundSms
 import org.fossify.commons.extensions.baseConfig
 import org.fossify.commons.extensions.getMyContactsCursor
 import org.fossify.commons.extensions.isNumberBlocked
 import org.fossify.commons.extensions.showErrorToast
+import org.fossify.commons.extensions.toast
 import org.fossify.commons.helpers.ContactLookupResult
 import org.fossify.commons.helpers.SimpleContactsHelper
 import org.fossify.commons.helpers.ensureBackgroundThread
@@ -24,6 +29,7 @@ import org.fossify.messages.helpers.ReceiverUtils.isMessageFilteredOut
 import org.fossify.messages.helpers.refreshConversations
 import org.fossify.messages.helpers.refreshMessages
 import org.fossify.messages.models.Message
+import org.fossify.messages.transport.LocalInboundSink
 
 class MmsReceiver : MmsReceivedReceiver() {
 
@@ -91,6 +97,20 @@ class MmsReceiver : MmsReceivedReceiver() {
             threadId = mms.threadId,
             bitmap = glideBitmap
         )
+
+        // SMS-2-TOUCHPOINT 2/2: MMS arrivals pass through the seam so V1 classifies them
+        // NOT_FORWARDED instead of silently dropping them; media stays in the provider store.
+        val inboundOutcome = LocalInboundSink().onInbound(
+            InboundSms(
+                sender = address, body = mms.body, receivedAtMillis = mms.date * 1000L,
+                subscriptionId = mms.subscriptionId, kind = InboundKind.MMS,
+                providerId = mms.id, threadId = mms.threadId
+            )
+        )
+        if (inboundOutcome.disposition == InboundDisposition.NOT_FORWARDED) {
+            // Surface the skipped forwarding visibly, distinct from a handled message.
+            context.toast(id = R.string.mms_not_forwarded, length = Toast.LENGTH_LONG)
+        }
 
         val conversation = context.getConversations(mms.threadId).firstOrNull() ?: return
         runCatching { context.insertOrUpdateConversation(conversation) }

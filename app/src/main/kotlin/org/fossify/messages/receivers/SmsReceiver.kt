@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.provider.Telephony
+import inkstax.sms.transport.InboundSms
 import org.fossify.commons.extensions.baseConfig
 import org.fossify.commons.extensions.getMyContactsCursor
 import org.fossify.commons.extensions.isNumberBlocked
@@ -26,6 +27,7 @@ import org.fossify.messages.helpers.ReceiverUtils.isMessageFilteredOut
 import org.fossify.messages.helpers.refreshConversations
 import org.fossify.messages.helpers.refreshMessages
 import org.fossify.messages.models.Message
+import org.fossify.messages.transport.LocalInboundSink
 
 class SmsReceiver : BroadcastReceiver() {
 
@@ -151,6 +153,17 @@ class SmsReceiver : BroadcastReceiver() {
             body = body,
             threadId = threadId,
             bitmap = bitmap
+        )
+        // SMS-2-TOUCHPOINT 1/2: inbound SMS passes through the :transport seam's local
+        // binding after local persistence, so later bindings share this entry point.
+        LocalInboundSink().onInbound(
+            InboundSms(
+                sender = address, body = body, receivedAtMillis = date,
+                subscriptionId = subscriptionId,
+                // insertNewSMS returns 0L when the provider insert failed; that sentinel
+                // is not a provider row, so the seam must see an unknown id, not "sms:0".
+                providerId = newMessageId.takeIf { it != 0L }, threadId = threadId
+            )
         )
     }
 }
