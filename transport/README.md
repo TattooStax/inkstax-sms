@@ -358,10 +358,13 @@ is new files: `HeartbeatSchedule.kt` and its test in
 `:transport` (the schedule rhythm — first beat immediate, later
 beats one full interval — and the notification-state vocabulary
 every binding reads its latest outcome through), and
-`HeartbeatService.kt` in the app-side
-`org.fossify.messages.transport` package (the foreground service
-that beats through the heartbeat binding on that schedule and
-holds the persistent notification). Pairing starts the service
+`HeartbeatService.kt` and `HeartbeatAlarmReceiver.kt` in the
+app-side `org.fossify.messages.transport` package (a wake-up
+alarm on that schedule starts a one-beat foreground service —
+a standing dataSync service would exhaust the platform's
+foreground-service budget and a handler timer would sleep
+through deep idle — and the persistent notification is a
+standing notification each beat updates). Pairing starts the service
 and disconnect stops it, through edits to this track's own
 app-side callers; a beat that finds no usable credential stops
 the service again. SMS-16 sends no stale-alert (brain-side) and

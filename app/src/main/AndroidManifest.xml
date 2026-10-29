@@ -546,5 +546,9 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
+        <receiver
+            android:name=".transport.HeartbeatAlarmReceiver"
+            android:exported="false" />
+
     </application>
 </manifest>
