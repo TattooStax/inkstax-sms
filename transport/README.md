@@ -1,4 +1,4 @@
-# :transport — the bridge seam (SMS-1, SMS-2, SMS-3, SMS-4, SMS-5)
+# :transport — the bridge seam (SMS-1, SMS-2, SMS-3, SMS-4, SMS-5, SMS-6)
 
 Pure Kotlin/JVM module holding the InkStax SMS layer's one
 bridge seam. SMS-1 extracted the outbound side; SMS-2 adds the
@@ -39,6 +39,20 @@ inbound side with its local binding first.
   Pure definitions only: no scanner, no network exchange, and no
   credential storage lives here — a binding supplies the scanned
   text and exchange outcomes and acts on the states.
+- `PairingExchange.kt` — the pairing exchange and device-credential
+  definitions (SMS-6): what a successful exchange mints (a
+  per-device credential for exactly the scanned endpoint, never
+  the pairing token itself), which exchange failures end the
+  attempt (a spent or lapsed token — a fresh scan is the recovery)
+  versus leave it open (transient failures retry the same offer),
+  when a stored credential counts as this device's (its fields
+  are well formed and its on-device no-backup token names the
+  same device id, so a backup-restored credential re-pairs), the
+  per-endpoint usability check, and disconnect as the only way
+  out of the paired state. Pure definitions only: no network
+  exchange runs and no credential is stored here yet — a binding
+  performs the exchange, persists what these definitions accept,
+  and discards the credential on disconnect.
 - `InboundSink` + `InboundSms` + `inboundDispositionFor` — the
   inbound side of the seam (SMS-2). The disposition rule is
   shared by every binding: SMS text is handled, MMS is
@@ -57,7 +71,9 @@ inbound side with its local binding first.
   the ack/heartbeat *states* every binding shares, but no binding
   sends a heartbeat or an ack yet. SMS-5 defines the pairing
   payload and token *states*, but no scanner reads a QR and no
-  exchange runs yet. The local binding is
+  exchange runs yet. SMS-6 defines the exchange *outcome* and
+  credential *states* the same way, but no exchange runs and no
+  credential is stored yet. The local binding is
   in-process; host/cloud bindings stay design-intent until their
   own slices open.
 - **No second intake, store, or scheduler.** Receivers persist
