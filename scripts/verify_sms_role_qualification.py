@@ -50,11 +50,16 @@ def intent_filters(component):
     The platform qualifies a component by resolving a fixed intent
     against its filters: the intent carries a category and, depending
     on the component, a scheme or a MIME type, but never a host, a
-    path, or (for the untyped intents) a type. A filter that adds
-    such a constraint therefore never matches the qualification
-    intent, so the filter's data shape is reported whole — schemes,
-    MIME types, and whether any data element pins a host or a path —
-    and each requirement below states the exact shape it accepts.
+    path, or (for the untyped intents) a type. A filter that adds an
+    effective constraint of one of those kinds therefore never
+    matches the qualification intent, so the filter's data shape is
+    reported whole — schemes, MIME types, and whether it effectively
+    pins a location — and each requirement below states the exact
+    shape it accepts. Location attributes apply only through their
+    dependencies: a URI attribute counts for nothing without a
+    scheme somewhere in the filter, and a port or path counts for
+    nothing without a host, so a location is pinned exactly when
+    the filter declares both a scheme and a host.
     """
     for intent_filter in component.findall("intent-filter"):
         actions = {
@@ -65,7 +70,7 @@ def intent_filters(component):
         }
         schemes = set()
         mime_types = set()
-        pins_location = False
+        pins_host = False
         for data in intent_filter.findall("data"):
             scheme = data.get(ANDROID + "scheme")
             if scheme:
@@ -73,11 +78,9 @@ def intent_filters(component):
             mime_type = data.get(ANDROID + "mimeType")
             if mime_type:
                 mime_types.add(mime_type)
-            if any(
-                data.get(ANDROID + attr)
-                for attr in ("host", "port", "path", "pathPrefix", "pathPattern")
-            ):
-                pins_location = True
+            if data.get(ANDROID + "host"):
+                pins_host = True
+        pins_location = bool(schemes) and pins_host
         yield actions, categories, schemes, mime_types, pins_location
 
 
