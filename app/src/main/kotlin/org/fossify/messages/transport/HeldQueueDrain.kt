@@ -32,6 +32,17 @@ import inkstax.sms.transport.nextHeldInbound
  * pairing that holds no usable credential is not a link that
  * merely went quiet, and it releases nothing.
  *
+ * Each attempt delivers with the credential the queue was read
+ * under, captured before the delivery: a disconnect and re-pair
+ * landing while a delivery is in flight never reroutes a
+ * message taken in under the old pairing to the new pairing's
+ * endpoint. The release re-checks that pairing inside the
+ * guards before it folds anything — a pairing that changed
+ * mid-delivery leaves the stored queue, which is the new
+ * pairing's, untouched; the ack already landed at the pairing
+ * that was owed it, and the loop moves on to whatever the
+ * current pairing holds.
+ *
  * A negative hand-off time is a caller error and throws, for the
  * same reason the delivery binding throws for one: an argument
  * fault must never be reported as a delivery outcome.
@@ -46,42 +57,81 @@ fun Context.drainHeldInboundQueue(handedOffAtMillis: Long): HeldQueueDrainResult
     var deliveredCount = 0
     var sawHeld = false
     while (true) {
-        val queue = storedHeldInboundQueue()
-        val head = nextHeldInbound(queue) ?: break
+        // The credential and the queue are captured under the
+        // credential guard as one snapshot: credential changes
+        // run under the same guard, so the queue this attempt
+        // delivers from is the queue of the pairing whose
+        // credential it holds, never a mix of two pairings.
+        val snapshot = synchronized(CredentialGuard.lock) {
+            val snapshotCredential = storedDeviceCredential()
+            val snapshotQueue = if (snapshotCredential == null) {
+                emptyList()
+            } else {
+                storedHeldInboundQueue()
+            }
+            snapshotCredential to snapshotQueue
+        }
+        val credential = snapshot.first
+        val queue = snapshot.second
+        val head = nextHeldInbound(queue)
+        if (credential == null || head == null) {
+            break
+        }
         sawHeld = true
-        val result = performInboundDelivery(head.message, handedOffAtMillis)
+        val result = performInboundDelivery(credential, head.message, handedOffAtMillis)
         val outcome = (result as? InboundDeliveryBindingResult.Completed)?.outcome
         if (outcome !is InboundDeliveryOutcome.Acknowledged) {
             return HeldQueueDrainResult.Blocked(
                 stoppedBy = result,
                 deliveredCount = deliveredCount,
-                remainingCount = queue.size
+                // Read back under the guard at the stop, not
+                // the size this attempt read before its network
+                // call: an arrival held while the delivery was
+                // in flight is still held and counts here.
+                remainingCount = synchronized(HeldQueueGuard.lock) {
+                    storedHeldInboundQueue().size
+                }
             )
         }
         // The release folds onto the queue as stored now — not
         // the copy this attempt read before its network call —
-        // under the guard an arrival's hold also takes, so the
-        // read, fold, and store cannot interleave with a hold
-        // landing while the delivery was in flight.
-        val releaseStored = synchronized(HeldQueueGuard.lock) {
-            val current = storedHeldInboundQueue()
-            val remaining = heldQueueAfterDelivery(current, head.sourceId, outcome)
-            if (storeHeldInboundQueue(remaining)) {
-                true
-            } else {
-                // A failed commit can still leave the in-memory
-                // preferences holding the released queue, so the
-                // pre-release queue is written back before the
-                // failure is reported: whatever that write's own
-                // durability, the in-memory state a later drain
-                // in this process reads is the queue with the
-                // head still held, and the stored read-back
-                // below is what the report counts.
-                storeHeldInboundQueue(current)
-                false
+        // under both guards, in the order every caller takes
+        // them: the credential guard makes the pairing check
+        // and the store atomic against credential changes
+        // (which run under it too), and the queue guard an
+        // arrival's hold also takes keeps the read, fold, and
+        // store from interleaving with a hold landing while
+        // the delivery was in flight. The pairing is re-checked
+        // first, inside the same block: if it changed while
+        // the delivery was in flight, the stored queue belongs
+        // to the new pairing and this release stores nothing —
+        // the outcome is null, distinct from a store that was
+        // attempted and failed.
+        val releaseStored = synchronized(CredentialGuard.lock) {
+            synchronized(HeldQueueGuard.lock) {
+                if (storedDeviceCredential() != credential) {
+                    null
+                } else {
+                    val current = storedHeldInboundQueue()
+                    val remaining = heldQueueAfterDelivery(current, head.sourceId, outcome)
+                    if (storeHeldInboundQueue(remaining)) {
+                        true
+                    } else {
+                        // A failed commit can still leave the in-memory
+                        // preferences holding the released queue, so the
+                        // pre-release queue is written back before the
+                        // failure is reported: whatever that write's own
+                        // durability, the in-memory state a later drain
+                        // in this process reads is the queue with the
+                        // head still held, and the stored read-back
+                        // below is what the report counts.
+                        storeHeldInboundQueue(current)
+                        false
+                    }
+                }
             }
         }
-        if (!releaseStored) {
+        if (releaseStored == false) {
             return HeldQueueDrainResult.StorageFailed(
                 deliveredCount = deliveredCount,
                 remainingCount = storedHeldInboundQueue().size

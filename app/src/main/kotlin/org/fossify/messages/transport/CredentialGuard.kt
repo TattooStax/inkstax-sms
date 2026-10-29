@@ -8,7 +8,8 @@ package org.fossify.messages.transport
  * credential together with state belonging to that pairing —
  * the verdict caller checking its credential as it holds a
  * report, the pending report drain capturing its queue
- * snapshot and checking its pairing again at release — holds
+ * snapshot and checking its pairing again at release, the
+ * held inbound drain doing the same for its queue — holds
  * the same lock, so the pairing it captured cannot change
  * inside its guarded section. Without one order between them, a
  * disconnect and re-pair landing between a snapshot and its
