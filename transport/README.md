@@ -669,10 +669,12 @@ slices.
 ## Upstream touchpoint registry (SMS-28, ≤5, tagged in code)
 
 None — zero upstream files are modified in this slice.
-Everything in this slice is three new files
+Everything in this slice is four new files
 (PendingReportQueueDrain.kt, PendingReportQueueDrainResult.kt,
-and PendingReportQueueGuard.kt in the app-side
-org.fossify.messages.transport package) plus this README.
+PendingReportQueueGuard.kt, and CredentialGuard.kt in the
+app-side org.fossify.messages.transport package), changes to
+this track's own OutboundAckBinding.kt and
+CredentialStorage.kt, plus this README.
 The drain caller reports the stored queue SMS-27 persists
 through the outbound ack binding SMS-21 performs, in reached
 order, folding each answer back through the SMS-26 release
@@ -691,7 +693,13 @@ binding takes a caller-held credential for this — and the
 release re-checks that pairing inside the guard before
 folding, so a disconnect and re-pair landing mid-drain never
 reroutes a verdict to the new pairing's endpoint and never
-folds a release into the new pairing's queue. Every read-modify-write of the stored
+folds a release into the new pairing's queue: the stored
+credential's mutations (store and clear, in
+CredentialStorage.kt) run under a shared credential guard,
+and the drain captures its credential and queue as one
+snapshot under that guard and re-checks and stores its
+release under it, so a pairing change lands whole before or
+after those sections, never inside one. Every read-modify-write of the stored
 queue runs under one process-wide guard, with a drain's
 network call outside it, so a hold landing while a report is
 in flight is neither lost under that report's release nor

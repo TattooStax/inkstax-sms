@@ -65,6 +65,17 @@ fun Context.storedDeviceCredential(): DeviceCredential? {
  * the reported result — stored means verified, not attempted.
  */
 fun Context.storeDeviceCredential(credential: DeviceCredential): Boolean {
+    // The mutation runs under the credential guard (see
+    // CredentialGuard) so a pairing-scoped snapshot or release
+    // holding the same guard never races a half-changed
+    // pairing: the credential changes whole, before or after
+    // the guarded section, never inside it.
+    return synchronized(CredentialGuard.lock) {
+        storeDeviceCredentialGuarded(credential)
+    }
+}
+
+private fun Context.storeDeviceCredentialGuarded(credential: DeviceCredential): Boolean {
     val accepted = deviceCredentialFromStored(
         storedEndpointBase = credential.endpointBase,
         storedDeviceId = credential.deviceId,
@@ -133,6 +144,15 @@ fun Context.hasStoredCredentialMaterial(): Boolean {
  * that did not happen.
  */
 fun Context.clearDeviceCredential(): Boolean {
+    // Under the credential guard, for the same reason storing
+    // is: a disconnect must land whole around pairing-scoped
+    // snapshots and releases, never inside one.
+    return synchronized(CredentialGuard.lock) {
+        clearDeviceCredentialGuarded()
+    }
+}
+
+private fun Context.clearDeviceCredentialGuarded(): Boolean {
     val tokenFile = File(noBackupFilesDir, CREDENTIAL_TOKEN_FILE)
     runCatching {
         tokenFile.delete()
