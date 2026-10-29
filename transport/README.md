@@ -541,3 +541,21 @@ no caller delivers on arrival yet, and no outbound verdict
 queue is defined — the app-side storage of this queue, the
 drain caller, and the pending outbound report queue act on
 these definitions in later slices.
+
+## Upstream touchpoint registry (SMS-23, ≤5, tagged in code)
+
+None — zero upstream files are modified in this slice.
+Everything in this slice is one new file
+(`HeldQueueStorage.kt` in the app-side
+`org.fossify.messages.transport` package) plus this README.
+The storage persists the queue SMS-22 defines in the app shared
+preferences, in SMS-7's shape: the whole queue is written in
+one checked synchronous commit (with the slots of a previously
+longer queue removed), and reads rebuild each entry as a
+message and fold it through the SMS-22 definitions, so a
+restored entry is held only if it still qualifies and a
+restored queue never holds a source id twice. A store reports
+success only after a verifying read-back. SMS-23 wires no
+caller and drains nothing — the drain caller that delivers the
+head through SMS-20's binding, and the pending outbound
+report queue, act on this storage in later slices.
