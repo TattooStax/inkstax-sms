@@ -90,20 +90,58 @@ fun Context.storeDeviceCredential(credential: DeviceCredential): Boolean {
 }
 
 /**
- * Discards the stored credential and its token. Disconnect is the
- * only way out of the paired state, and a disconnected phone keeps
- * no working key (see :transport's pairingStateAfterDisconnect).
+ * Whether any credential material remains on this device: the
+ * on-device token file, or any of the stored credential fields.
+ * This is deliberately broader than [storedDeviceCredential]: a
+ * clear that only partly finished leaves material behind (the
+ * token gone but the secret still in preferences, or the fields
+ * removed but the token file still present), and such a phone
+ * reads back as unpaired while the leftover is still there to
+ * remove. Disconnect therefore keys its entry and its retry on
+ * material, not on the usable credential, so a partial clear can
+ * always be retried until nothing remains.
+ */
+fun Context.hasStoredCredentialMaterial(): Boolean {
+    if (File(noBackupFilesDir, CREDENTIAL_TOKEN_FILE).exists()) {
+        return true
+    }
+    val prefs = getSharedPrefs()
+    return prefs.getString(PAIRED_ENDPOINT_BASE, null) != null ||
+        prefs.getString(PAIRED_DEVICE_ID, null) != null ||
+        prefs.getString(PAIRED_DEVICE_SECRET, null) != null
+}
+
+/**
+ * Discards the stored credential and its token, and returns
+ * whether the phone reads back as unpaired afterwards. Disconnect
+ * is the only way out of the paired state, and a disconnected
+ * phone keeps no working key (see :transport's
+ * pairingStateAfterDisconnect) — the secret itself is discarded
+ * too, not merely made unusable, because a key that lingers in
+ * storage after its owner disconnected can be revived by a later
+ * token write for the same device id.
+ *
  * The token is removed first, so from that moment the stored
  * fields — whatever of them remains — no longer count as a
- * credential on this device.
+ * credential on this device. The fields are then removed in one
+ * synchronous commit for the same reason storing uses one: an
+ * unchecked asynchronous removal cannot be reported honestly.
+ * Success means verified, not attempted: the token file is gone,
+ * the removal committed, and the read-back finds no credential.
+ * A caller told the clear failed knows the phone may still be
+ * paired and can offer a retry instead of announcing a disconnect
+ * that did not happen.
  */
-fun Context.clearDeviceCredential() {
+fun Context.clearDeviceCredential(): Boolean {
+    val tokenFile = File(noBackupFilesDir, CREDENTIAL_TOKEN_FILE)
     runCatching {
-        File(noBackupFilesDir, CREDENTIAL_TOKEN_FILE).delete()
+        tokenFile.delete()
     }
-    getSharedPrefs().edit()
+    val tokenGone = !tokenFile.exists()
+    val committed = getSharedPrefs().edit()
         .remove(PAIRED_ENDPOINT_BASE)
         .remove(PAIRED_DEVICE_ID)
         .remove(PAIRED_DEVICE_SECRET)
-        .apply()
+        .commit()
+    return tokenGone && committed && storedDeviceCredential() == null
 }

@@ -1,4 +1,4 @@
-# :transport — the bridge seam (SMS-1, SMS-2, SMS-3, SMS-4, SMS-5, SMS-6, SMS-7, SMS-8, SMS-9, SMS-10)
+# :transport — the bridge seam (SMS-1, SMS-2, SMS-3, SMS-4, SMS-5, SMS-6, SMS-7, SMS-8, SMS-9, SMS-10, SMS-11)
 
 Pure Kotlin/JVM module holding the InkStax SMS layer's one
 bridge seam. SMS-1 extracted the outbound side; SMS-2 adds the
@@ -114,6 +114,25 @@ A phone that already holds a credential pairs nothing new
 (PAIRED is terminal; re-pairing is a disconnect first), and a
 process-wide single-flight guard covers the paired check, the
 exchange, and the storage retry together.
+`PairingDisconnect.kt` (SMS-11) is the disconnect caller, the
+defined exit from PAIRED: a Settings entry shown while any
+credential material is stored asks for confirmation, then the
+clear runs under the same single-flight guard, and only a
+verified clear is reported as a disconnect. SMS-7's clear now
+reports its result too — the token file is gone, the field
+removal is one synchronous commit, and the read-back finds no
+credential — so an unfinished clear is announced as unfinished,
+never as a disconnect that did not happen. The entry and the
+retry key on stored material (`hasStoredCredentialMaterial`),
+not on the usable credential, because a partly finished clear
+leaves a phone that reads as unpaired but still holds a
+leftover token or secret, and that leftover is what a retry
+exists to remove. The pairing scanner takes a completion
+callback (SMS-11): the exchange finishes on a background
+thread after Settings resumes, so the callback is what makes
+the disconnect entry appear for a just-completed pairing.
+After a disconnect the phone pairs afresh through the same
+scanner flow; there is no second re-pair path.
 
 ## Upstream touchpoint registry (SMS-1, ≤5, tagged in code)
 
@@ -221,6 +240,22 @@ The library's own manifest supplies the camera permission and
 its capture activity, so this slice adds no manifest entry.
 Still not claimed: the download/App-Link serving of the QR is
 brain-side work, and no binding sends a heartbeat or an ack yet.
+
+## Upstream touchpoint registry (SMS-11, ≤5, tagged in code)
+
+| # | File | Change |
+|---|------|--------|
+| 1 | `app/src/main/res/values/strings.xml` | The disconnect entry label, confirmation, and outcome messages |
+| 2 | `app/src/main/res/layout/activity_settings.xml` | The "Disconnect from your business system" row in Settings |
+| 3 | `app/src/main/kotlin/org/fossify/messages/activities/SettingsActivity.kt` | Wires the disconnect row, shown while any credential material is stored, refreshed on resume, on pairing completion, and after a disconnect |
+
+Everything else in this slice is two new files
+(`PairingDisconnect.kt` and `PairingAttemptGuard.kt` in the app-side
+`org.fossify.messages.transport` package), changes to this
+track's own app-side files (`CredentialStorage.kt`'s clear
+reports a verified result; the pairing single-flight guard
+moves into its own `PairingAttemptGuard.kt`, shared by the
+pairing attempt and the disconnect clear), and this README.
 
 SMS-3 note: the dedicated posture keeps the upstream startup flow
 unchanged (default role requested, declining it exits). The
