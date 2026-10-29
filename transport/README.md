@@ -1,4 +1,4 @@
-# :transport — the bridge seam (SMS-1, SMS-2, SMS-3, SMS-4, SMS-5, SMS-6)
+# :transport — the bridge seam (SMS-1, SMS-2, SMS-3, SMS-4, SMS-5, SMS-6, SMS-7)
 
 Pure Kotlin/JVM module holding the InkStax SMS layer's one
 bridge seam. SMS-1 extracted the outbound side; SMS-2 adds the
@@ -50,9 +50,9 @@ inbound side with its local binding first.
   same device id, so a backup-restored credential re-pairs), the
   per-endpoint usability check, and disconnect as the only way
   out of the paired state. Pure definitions only: no network
-  exchange runs and no credential is stored here yet — a binding
-  performs the exchange, persists what these definitions accept,
-  and discards the credential on disconnect.
+  exchange runs here — a binding performs the exchange, persists
+  what these definitions accept (the app-side storage lands in
+  SMS-7), and discards the credential on disconnect.
 - `InboundSink` + `InboundSms` + `inboundDispositionFor` — the
   inbound side of the seam (SMS-2). The disposition rule is
   shared by every binding: SMS text is handled, MMS is
@@ -72,8 +72,9 @@ inbound side with its local binding first.
   sends a heartbeat or an ack yet. SMS-5 defines the pairing
   payload and token *states*, but no scanner reads a QR and no
   exchange runs yet. SMS-6 defines the exchange *outcome* and
-  credential *states* the same way, but no exchange runs and no
-  credential is stored yet. The local binding is
+  credential *states* the same way, but no exchange runs yet;
+  SMS-7 adds the app-side credential storage that persists what
+  the definitions accept. The local binding is
   in-process; host/cloud bindings stay design-intent until their
   own slices open.
 - **No second intake, store, or scheduler.** Receivers persist
@@ -122,6 +123,22 @@ other upstream file is modified.
 | 3 | `app/src/main/res/values/strings.xml` | The posture question string and its two answer strings |
 | 4 | `app/src/main/AndroidManifest.xml` | Registers `SmsReceivedReceiver` for SMS_RECEIVED, the permissions-only posture's inbound copy |
 | 5 | `app/src/main/kotlin/org/fossify/messages/extensions/Context.kt` | `deleteConversation` refuses when this app does not hold the default SMS role and directs the user to their default messenger - only the default app may write the provider, so the deletion would otherwise clear only this app's cache and the conversation would be imported again |
+
+## Upstream touchpoint registry (SMS-7, ≤5, tagged in code)
+
+| # | File | Change |
+|---|------|--------|
+| 1 | `app/src/main/kotlin/org/fossify/messages/helpers/Config.kt` | Stores the paired credential's fields as plain strings (`pairedEndpointBase` / `pairedDeviceId` / `pairedDeviceSecret`) plus a clear for all three; whether they count as this device's credential is decided in `:transport` |
+
+Everything else in this slice is a new file
+(`CredentialStorage.kt` in the app-side
+`org.fossify.messages.transport` package): it stores a credential
+the exchange minted together with its on-device token in
+no-backup storage, reads it back only through
+`deviceCredentialFromStored`, and clears both on disconnect.
+SMS-7 stores and reads a credential; it does not run the network
+exchange and no scanner reads a QR yet — those act on this
+storage in a later slice.
 
 SMS-3 note: the dedicated posture keeps the upstream startup flow
 unchanged (default role requested, declining it exits). The
