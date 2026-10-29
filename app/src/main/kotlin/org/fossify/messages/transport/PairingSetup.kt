@@ -118,6 +118,10 @@ private fun Activity.handleScannedPairingPayload(contents: String, onPaired: () 
             runOnUiThread {
                 toast(messageId)
                 if (pairedNow) {
+                    // A paired phone starts beating at once: the
+                    // link this pairing created is the heartbeat
+                    // service's whole reason to run.
+                    startHeartbeatService()
                     // The host resumed before this background exchange
                     // finished, so any paired-state UI it refreshed on
                     // resume predates the stored credential; the

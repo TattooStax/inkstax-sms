@@ -73,6 +73,9 @@ private fun Activity.disconnectPairing(onDisconnected: () -> Unit) {
             val cleared = hasStoredCredentialMaterial() && clearDeviceCredential()
             runOnUiThread {
                 if (cleared) {
+                    // No credential remains, so the heartbeat
+                    // service has nothing to beat with and stops.
+                    stopHeartbeatService()
                     toast(R.string.pairing_disconnected)
                     onDisconnected()
                 } else {

@@ -5,6 +5,9 @@
 
     <!-- SMS-9-TOUCHPOINT 1/1: the pairing exchange binding talks to the brain's endpoint over HTTPS -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- SMS-16-TOUCHPOINT 1/2: the heartbeat caller is a foreground service -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.READ_SMS" />
     <uses-permission android:name="android.permission.WRITE_SMS" />
     <uses-permission android:name="android.permission.SEND_SMS" />
@@ -537,5 +540,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity-alias>
+        <!-- SMS-16-TOUCHPOINT 1/2: the scheduled heartbeat caller and its persistent notification -->
+        <service
+            android:name=".transport.HeartbeatService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
     </application>
 </manifest>

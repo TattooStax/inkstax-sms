@@ -25,6 +25,14 @@
     <string name="pairing_disconnected">This phone is disconnected</string>
     <string name="pairing_disconnect_failed">Disconnecting did not finish. Try again.</string>
     <string name="pairing_not_paired">This phone is not paired</string>
+    <!-- SMS-16-TOUCHPOINT 2/2: the heartbeat service channel and its persistent notification states -->
+    <string name="heartbeat_channel_name">Business system link</string>
+    <string name="heartbeat_notification_title">Business system link</string>
+    <string name="heartbeat_notification_starting">Link is starting</string>
+    <string name="heartbeat_notification_linked">Linked to your business system</string>
+    <string name="heartbeat_notification_unreachable">Cannot reach your business system — will keep trying</string>
+    <string name="heartbeat_notification_rejected">Your business system no longer accepts this phone — disconnect and pair again</string>
+    <string name="heartbeat_notification_problem">Your business system answered unexpectedly — will keep trying</string>
     <string name="delete_conversation_requires_default_messenger">This app is not your default messaging app, so it cannot delete conversations. Delete this conversation in your default messenger instead.</string>
     <string name="message_not_sent_touch_retry">Not sent. Touch to retry.</string>
     <string name="message_sending_error">Your message to \'%s\' has not been sent</string>
