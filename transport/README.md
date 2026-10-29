@@ -1,4 +1,4 @@
-# :transport — the bridge seam (SMS-1, SMS-2, SMS-3, SMS-4)
+# :transport — the bridge seam (SMS-1, SMS-2, SMS-3, SMS-4, SMS-5)
 
 Pure Kotlin/JVM module holding the InkStax SMS layer's one
 bridge seam. SMS-1 extracted the outbound side; SMS-2 adds the
@@ -28,6 +28,17 @@ inbound side with its local binding first.
   move backwards), and the received-late rule. Pure definitions
   only: no timer, scheduler, or alert sending lives here — a
   binding supplies timestamps/events and acts on the states.
+- `Pairing.kt` — the onboarding pairing definitions (SMS-5):
+  the QR payload shape (`https://<endpoint>/companion/start?t=<token>`,
+  read strictly by `pairingOfferFromQrPayload` — anything else is
+  no offer), the pairing token's life (single-use, 10 minutes,
+  spent outranks expired, clock skew never expires a fresh token),
+  the pairing state transitions (an exchange succeeds only from a
+  scanned offer, PAIRED is terminal, a fresh scan after expiry is
+  the recovery), and the 6-digit typed fallback code's format.
+  Pure definitions only: no scanner, no network exchange, and no
+  credential storage lives here — a binding supplies the scanned
+  text and exchange outcomes and acts on the states.
 - `InboundSink` + `InboundSms` + `inboundDispositionFor` — the
   inbound side of the seam (SMS-2). The disposition rule is
   shared by every binding: SMS text is handled, MMS is
@@ -44,7 +55,9 @@ inbound side with its local binding first.
 - **No bridge protocol yet.** No wire format, no network
   transport, no endpoint or credential material. SMS-4 defines
   the ack/heartbeat *states* every binding shares, but no binding
-  sends a heartbeat or an ack yet. The local binding is
+  sends a heartbeat or an ack yet. SMS-5 defines the pairing
+  payload and token *states*, but no scanner reads a QR and no
+  exchange runs yet. The local binding is
   in-process; host/cloud bindings stay design-intent until their
   own slices open.
 - **No second intake, store, or scheduler.** Receivers persist
