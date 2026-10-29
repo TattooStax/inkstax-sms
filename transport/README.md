@@ -1,4 +1,4 @@
-# :transport — the bridge seam (SMS-1, SMS-2, SMS-3, SMS-4, SMS-5, SMS-6, SMS-7, SMS-8, SMS-9, SMS-10, SMS-11), SMS-12, SMS-14, SMS-15, SMS-18, SMS-19, SMS-20, SMS-21, SMS-22, SMS-26, SMS-27, SMS-28, SMS-29
+# :transport — the bridge seam (SMS-1, SMS-2, SMS-3, SMS-4, SMS-5, SMS-6, SMS-7, SMS-8, SMS-9, SMS-10, SMS-11), SMS-12, SMS-14, SMS-15, SMS-18, SMS-19, SMS-20, SMS-21, SMS-22, SMS-26, SMS-27, SMS-28, SMS-29, SMS-33
 
 Pure Kotlin/JVM module holding the InkStax SMS layer's one
 bridge seam. SMS-1 extracted the outbound side; SMS-2 adds the
@@ -863,3 +863,42 @@ counts. Before this slice the drain read its queue and
 released it under the queue guard alone while the binding
 reloaded the credential on its own, so the pairing race the
 outbound drain's closure removed stayed latent here.
+
+## One-tap default-SMS setup (SMS-33)
+
+Setup never sends the user hunting: no Settings page to find,
+no code to type, and no QR scan as a required step. The pure
+definitions in DefaultSmsRole.kt name the one screen a
+dedicated business phone's setup opens next, from the platform
+facts a caller reads: ALREADY_DEFAULT when either witness —
+the role system's held answer or the default-package answer —
+says the role is held, REQUEST_ROLE for the role system's SMS
+request screen where that role is available on API 29+,
+CHANGE_DEFAULT for the platform's change-default screen
+before API 29, and OPEN_DEFAULT_APPS_SETTINGS where the role
+is unavailable on API 29+, so setup opens the system's
+default-apps screen directly instead of dead-ending on an
+error. The scanner and the typed pairing code remain optional
+fallbacks elsewhere in setup; neither is a step this flow
+requires.
+
+## Upstream touchpoint registry (SMS-33 one-tap setup, ≤5, tagged in code)
+
+One tagged touchpoint — MainActivity (SMS-33-TOUCHPOINT 1/1):
+its startup flow, which already asks the posture question
+before the message flow starts, now hands a dedicated phone
+to this track's one-tap caller (DefaultSmsRoleSetup.kt in the
+app-side org.fossify.messages.transport package) instead of
+branching on the role system inline, and judges the screen's
+return by reading the held state back, because the screens
+setup opens do not all report a grant the same way. The
+caller performs the step the :transport definitions name
+with the same request code the flow already used, so the
+user's part stays the one tap on the screen that opens.
+Everything else in this slice is new files (DefaultSmsRole.kt
+and its test in :transport, DefaultSmsRoleSetup.kt app-side)
+plus this README. (Registry note: the section above headed
+SMS-33 records the inbound drain credential-guard closure,
+which ran in flight under that number before this item took
+it; the drain work carries no SMS-33 code tags, so the tag
+above names this slice alone.)
