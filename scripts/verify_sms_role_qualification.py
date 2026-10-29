@@ -92,6 +92,29 @@ def usable(component):
     )
 
 
+def effective_permission(component, application):
+    """The permission a component is actually gated by.
+
+    A component that omits its own permission attribute inherits
+    the application's; one that sets the attribute, even to an
+    empty value, is gated by exactly what it sets.
+    """
+    if ANDROID + "permission" in component.attrib:
+        return component.get(ANDROID + "permission")
+    return application.get(ANDROID + "permission")
+
+
+def mime_matches(pattern, mime_type):
+    """Whether a filter's MIME pattern matches a concrete type.
+
+    The platform matches a declared pattern against the intent's
+    type with the subtype (or the whole type) allowed to wildcard.
+    """
+    if pattern == mime_type or pattern == "*/*":
+        return True
+    return pattern.endswith("/*") and mime_type.startswith(pattern[:-1])
+
+
 def any_filter(component, predicate):
     return any(predicate(f) for f in intent_filters(component))
 
@@ -139,7 +162,7 @@ def check_manifest(path):
     # invoke for that purpose. That intent is likewise untyped and
     # hostless.
     if not any(
-        service.get(ANDROID + "permission") == SEND_RESPOND_PERMISSION
+        effective_permission(service, application) == SEND_RESPOND_PERMISSION
         and any_filter(
             service,
             lambda f: RESPOND_VIA_MESSAGE in f[0]
@@ -159,7 +182,7 @@ def check_manifest(path):
     # receiver only the system can trigger. The delivery intent
     # carries no data, so the qualifying filter declares none.
     if not any(
-        receiver.get(ANDROID + "permission") == BROADCAST_SMS_PERMISSION
+        effective_permission(receiver, application) == BROADCAST_SMS_PERMISSION
         and any_filter(
             receiver,
             lambda f: SMS_DELIVER in f[0] and not f[2] and not f[3] and not f[4],
@@ -175,11 +198,12 @@ def check_manifest(path):
     # carries a type but no URI, so the qualifying filter pins no
     # scheme or location.
     if not any(
-        receiver.get(ANDROID + "permission") == BROADCAST_WAP_PUSH_PERMISSION
+        effective_permission(receiver, application)
+        == BROADCAST_WAP_PUSH_PERMISSION
         and any_filter(
             receiver,
             lambda f: WAP_PUSH_DELIVER in f[0]
-            and MMS_MIME_TYPE in f[3]
+            and any(mime_matches(pattern, MMS_MIME_TYPE) for pattern in f[3])
             and not f[2]
             and not f[4],
         )
@@ -203,8 +227,12 @@ REQUIRED_APK_LITERALS = [
     BROADCAST_SMS_PERMISSION,
     WAP_PUSH_DELIVER,
     BROADCAST_WAP_PUSH_PERMISSION,
-    MMS_MIME_TYPE,
 ]
+
+# The packaged WAP filter may spell its type with a wildcard that
+# still matches the MMS type; any one of these spellings carries
+# the requirement into the artifact.
+APK_MIME_SPELLINGS = [MMS_MIME_TYPE, "application/*", "*/*"]
 
 
 def find_aapt2():
@@ -238,11 +266,16 @@ def check_apk(path):
     # value keeps a renamed string that merely contains a required
     # literal (an action with a suffix added, say) from satisfying
     # the check.
-    return [
+    unmet = [
         f"APK manifest is missing {literal}"
         for literal in REQUIRED_APK_LITERALS
         if f'"{literal}"' not in result.stdout
     ]
+    if not any(f'"{spelling}"' in result.stdout for spelling in APK_MIME_SPELLINGS):
+        unmet.append(
+            f"APK manifest is missing a MIME type matching {MMS_MIME_TYPE}"
+        )
+    return unmet
 
 
 def main(argv):
