@@ -70,7 +70,7 @@ fun bridgeHealthAt(lastHeartbeatMillis: Long?, nowMillis: Long): BridgeHealth {
     val silenceMillis = maxOf(0L, nowMillis - lastHeartbeatMillis)
     return when {
         silenceMillis <= HEARTBEAT_INTERVAL_MILLIS -> BridgeHealth.CONNECTED
-        silenceMillis <= STALE_ALERT_AFTER_MILLIS -> BridgeHealth.OVERDUE
+        silenceMillis < STALE_ALERT_AFTER_MILLIS -> BridgeHealth.OVERDUE
         else -> BridgeHealth.STALE
     }
 }

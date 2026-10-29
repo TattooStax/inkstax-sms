@@ -24,12 +24,13 @@ class FailureHonestyTest {
     @Test
     fun `one missed heartbeat is overdue but not yet stale`() {
         assertEquals(BridgeHealth.OVERDUE, bridgeHealthAt(t0, t0 + HEARTBEAT_INTERVAL_MILLIS + 1))
-        assertEquals(BridgeHealth.OVERDUE, bridgeHealthAt(t0, t0 + STALE_ALERT_AFTER_MILLIS))
+        assertEquals(BridgeHealth.OVERDUE, bridgeHealthAt(t0, t0 + STALE_ALERT_AFTER_MILLIS - 1))
         assertFalse(BridgeHealth.OVERDUE.requiresStaleAlert)
     }
 
     @Test
-    fun `silence past the stale window is stale and raises the alert`() {
+    fun `silence at the stale deadline is stale and raises the alert`() {
+        assertEquals(BridgeHealth.STALE, bridgeHealthAt(t0, t0 + STALE_ALERT_AFTER_MILLIS))
         assertEquals(BridgeHealth.STALE, bridgeHealthAt(t0, t0 + STALE_ALERT_AFTER_MILLIS + 1))
         assertTrue(BridgeHealth.STALE.requiresStaleAlert)
         assertFalse(BridgeHealth.CONNECTED.requiresStaleAlert)
