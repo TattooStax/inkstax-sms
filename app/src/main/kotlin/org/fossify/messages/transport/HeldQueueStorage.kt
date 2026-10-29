@@ -86,12 +86,20 @@ fun Context.storeHeldInboundQueue(queue: List<HeldInboundMessage>): Boolean {
  * The message stored at [index], or null when its record is
  * incomplete or unreadable: a partly written or damaged entry
  * must not be reconstructed into a message the definitions never
- * held. The nullable provider and thread ids travel as a
- * presence flag beside the value, because a numeric sentinel
- * could collide with a real row id and mint an identity the
- * provider never gave the message.
+ * held, and one damaged entry must not abort the restoration of
+ * the entries behind it, so a decoding failure reads as that
+ * entry's absence. The nullable provider and thread ids travel
+ * as a presence flag beside the value, because a numeric
+ * sentinel could collide with a real row id and mint an identity
+ * the provider never gave the message — and a presence flag
+ * whose value is missing is an incomplete entry, never a
+ * licence to read the absent value as zero.
  */
 private fun storedHeldMessageAt(prefs: SharedPreferences, index: Int): InboundSms? {
+    return runCatching { decodedHeldMessageAt(prefs, index) }.getOrNull()
+}
+
+private fun decodedHeldMessageAt(prefs: SharedPreferences, index: Int): InboundSms? {
     val sender = prefs.getString(HELD_SENDER_PREFIX + index, null) ?: return null
     val body = prefs.getString(HELD_BODY_PREFIX + index, null) ?: return null
     if (!prefs.contains(HELD_RECEIVED_AT_PREFIX + index)) {
@@ -109,6 +117,12 @@ private fun storedHeldMessageAt(prefs: SharedPreferences, index: Int): InboundSm
     if (!prefs.contains(HELD_THREAD_PRESENT_PREFIX + index)) {
         return null
     }
+    if (!storedNullableLongIsReadable(prefs, HELD_PROVIDER_PRESENT_PREFIX + index, HELD_PROVIDER_ID_PREFIX + index)) {
+        return null
+    }
+    if (!storedNullableLongIsReadable(prefs, HELD_THREAD_PRESENT_PREFIX + index, HELD_THREAD_ID_PREFIX + index)) {
+        return null
+    }
     return InboundSms(
         sender = sender,
         body = body,
@@ -118,6 +132,14 @@ private fun storedHeldMessageAt(prefs: SharedPreferences, index: Int): InboundSm
         providerId = storedNullableLong(prefs, HELD_PROVIDER_PRESENT_PREFIX + index, HELD_PROVIDER_ID_PREFIX + index),
         threadId = storedNullableLong(prefs, HELD_THREAD_PRESENT_PREFIX + index, HELD_THREAD_ID_PREFIX + index)
     )
+}
+
+/** Whether a presence flag and its value agree: absent needs no value, present needs one. */
+private fun storedNullableLongIsReadable(prefs: SharedPreferences, presentKey: String, valueKey: String): Boolean {
+    if (!prefs.getBoolean(presentKey, false)) {
+        return true
+    }
+    return prefs.contains(valueKey)
 }
 
 /** The nullable long named by a presence flag: the value when present, null when absent. */
